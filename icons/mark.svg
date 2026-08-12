@@ -1,0 +1,25 @@
+<!-- Source of truth for the toolbar icons — the Practice Studio asterisk,
+     from practice-studio-desktop/src-tauri/icons/practice-studio-mark.svg.
+
+     Two changes from the app icon: the rounded square is full-bleed rather
+     than inset, and the asterisk is scaled up to match (1024/816). macOS app
+     icons need that breathing room; a 16px toolbar icon can't spare it, and
+     Chrome adds its own padding anyway.
+
+     Regenerate the PNGs with `node scripts/render-icons.mjs`. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Practice Studio Clipper</title>
+  <rect x="0" y="0" width="1024" height="1024" rx="231" ry="231" fill="#E9E4D6" />
+  <g transform="translate(512 512) scale(1.2549)" fill="#1A1917">
+    <circle cx="0" cy="0" r="97" />
+    <path transform="rotate(-90.47)" d="M 27.79 -41.9 L 274.42 -54.9 A 54.97 54.97 0 1 1 274.42 54.9 L 27.79 41.9 A 41.96 41.96 0 0 1 27.79 -41.9 Z" />
+    <path transform="rotate(-49.64)" d="M 28.96 -46.53 L 262.32 -51.77 A 51.78 51.78 0 1 1 262.32 51.77 L 28.96 46.53 A 46.54 46.54 0 0 1 28.96 -46.53 Z" />
+    <path transform="rotate(-9.51)" d="M 28.79 -46.31 L 267.73 -52.54 A 52.55 52.55 0 1 1 267.73 52.54 L 28.79 46.31 A 46.32 46.32 0 0 1 28.79 -46.31 Z" />
+    <path transform="rotate(30.4)" d="M 28.45 -46.07 L 257.89 -53.79 A 53.82 53.82 0 1 1 257.89 53.79 L 28.45 46.07 A 46.1 46.1 0 0 1 28.45 -46.07 Z" />
+    <path transform="rotate(70.49)" d="M 28.86 -45.7 L 279.23 -51.94 A 51.95 51.95 0 1 1 279.23 51.94 L 28.86 45.7 A 45.71 45.71 0 0 1 28.86 -45.7 Z" />
+    <path transform="rotate(110.13)" d="M 28.8 -46.13 L 281.48 -52.72 A 52.74 52.74 0 1 1 281.48 52.72 L 28.8 46.13 A 46.14 46.14 0 0 1 28.8 -46.13 Z" />
+    <path transform="rotate(150.28)" d="M 28.64 -45.24 L 267.63 -52.4 A 52.42 52.42 0 1 1 267.63 52.4 L 28.64 45.24 A 45.26 45.26 0 0 1 28.64 -45.24 Z" />
+    <path transform="rotate(189.74)" d="M 27.98 -42.42 L 267.25 -53.79 A 53.85 53.85 0 1 1 267.25 53.79 L 27.98 42.42 A 42.47 42.47 0 0 1 27.98 -42.42 Z" />
+    <path transform="rotate(229.66)" d="M 28.98 -46.45 L 277.85 -51.93 A 51.94 51.94 0 1 1 277.85 51.93 L 28.98 46.45 A 46.46 46.46 0 0 1 28.98 -46.45 Z" />
+  </g>
+</svg>

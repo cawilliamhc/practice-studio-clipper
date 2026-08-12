@@ -73,6 +73,23 @@ Specialization is written twice on purpose. Practice Studio's `parseVCardRows` h
 would silently drop ours. `NOTE` survives that path today; the `X-` property is there for
 when step 2 teaches the importer to read it.
 
+## Icons
+
+The toolbar mark is the Practice Studio asterisk, taken from
+`practice-studio-desktop/src-tauri/icons/practice-studio-mark.svg` and made full-bleed —
+the app icon's inset padding is worth losing at 16px, where Chrome adds its own.
+
+`icons/mark.svg` is the source. There's no SVG rasterizer on this machine, so the browser
+draws and Node writes:
+
+```bash
+node scripts/render-icons.mjs
+```
+
+Then open the URL it prints. It writes `icon-{16,32,48,128}.png` and exits. Opening
+`icons/render.html` off any static server works too — it previews every size against light
+and dark toolbars and has a "Download all" button.
+
 ## Tests
 
 ```bash

@@ -1,0 +1,101 @@
+<!doctype html>
+<!-- Rasterizes mark.svg into the PNG sizes Chrome wants.
+
+     There's no rasterizer on this machine (no rsvg-convert / ImageMagick, and
+     QuickLook won't thumbnail an SVG), so the browser is the toolchain. Serve
+     the project and open this page:
+
+         python3 -m http.server 8765 --directory .
+         open http://localhost:8765/icons/render.html
+
+     Click "Download all" and move the four files into icons/. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Render clipper icons</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #f4f4f5;
+        color: #18181b;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      h1 { font-size: 16px; margin: 0 0 16px; }
+      .row { display: flex; align-items: flex-end; gap: 24px; margin-bottom: 20px; }
+      figure { margin: 0; text-align: center; }
+      figcaption { margin-top: 6px; font-size: 11px; color: #71717a; }
+      canvas { display: block; image-rendering: pixelated; }
+      .dark { background: #18181b; padding: 12px; border-radius: 8px; }
+      button {
+        padding: 8px 14px; border: 0; border-radius: 6px;
+        background: #2563eb; color: #fff; font: inherit; font-weight: 600; cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Practice Studio Clipper icons</h1>
+    <div class="row" id="light"></div>
+    <div class="row dark" id="dark"></div>
+    <button id="download">Download all</button>
+    <script>
+      const SIZES = [16, 32, 48, 128];
+
+      const loadMark = () =>
+        new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error("couldn't load mark.svg"));
+          // Same-origin, and the SVG references nothing external, so the
+          // canvas stays untainted and toDataURL keeps working.
+          img.src = "mark.svg";
+        });
+
+      function renderTo(container, img, size) {
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        canvas.getContext("2d").drawImage(img, 0, 0, size, size);
+        const figure = document.createElement("figure");
+        const caption = document.createElement("figcaption");
+        caption.textContent = `${size}px`;
+        figure.append(canvas, caption);
+        container.append(figure);
+        return canvas;
+      }
+
+      (async () => {
+        const img = await loadMark();
+        const light = document.getElementById("light");
+        const dark = document.getElementById("dark");
+        const icons = {};
+        for (const size of SIZES) {
+          const canvas = renderTo(light, img, size);
+          renderTo(dark, img, size);
+          icons[size] = canvas.toDataURL("image/png").split(",")[1];
+        }
+        // Read by browser automation.
+        window.__icons = icons;
+        // Served by scripts/render-icons.mjs, which writes them to icons/.
+        if (new URLSearchParams(location.search).has("save")) {
+          const res = await fetch("/save", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(icons),
+          });
+          const status = document.createElement("p");
+          status.textContent = res.ok ? `Saved: ${await res.text()}` : `Save failed: ${await res.text()}`;
+          document.body.append(status);
+        }
+        document.getElementById("download").addEventListener("click", () => {
+          for (const size of SIZES) {
+            const a = document.createElement("a");
+            a.href = `data:image/png;base64,${icons[size]}`;
+            a.download = `icon-${size}.png`;
+            a.click();
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

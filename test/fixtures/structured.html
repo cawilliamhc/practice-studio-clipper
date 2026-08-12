@@ -1,0 +1,50 @@
+<!doctype html>
+<!-- Fixture: a therapist site that emits schema.org JSON-LD, the shape most
+     Squarespace/Wix templates and Psychology Today profiles produce.
+     Every name and number here is invented. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Rowan Aldridge, LCSW | Trauma Therapy in Ashford</title>
+    <meta property="og:title" content="Rowan Aldridge, LCSW — Trauma Therapy" />
+    <meta property="og:site_name" content="Cedar Hollow Counseling" />
+    <link rel="canonical" href="http://localhost:8765/structured.html" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "LocalBusiness",
+            "name": "Cedar Hollow Counseling, PLLC",
+            "telephone": "(555) 010-9000",
+            "url": "https://cedarhollow.example"
+          },
+          {
+            "@type": "Person",
+            "name": "Rowan Aldridge, LCSW",
+            "jobTitle": "Clinical Social Worker",
+            "telephone": "(555) 010-4477",
+            "email": "mailto:rowan@cedarhollow.example",
+            "url": "https://cedarhollow.example/about",
+            "knowsAbout": ["EMDR", "Adolescent anxiety", "Grief"],
+            "worksFor": { "@type": "Organization", "name": "Cedar Hollow Counseling, PLLC" },
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "18 Fern Street, Suite 4",
+              "addressLocality": "Ashford",
+              "addressRegion": "VT",
+              "postalCode": "05001"
+            }
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <h1>Welcome — I'm Rowan</h1>
+    <p>Individual and family therapy in Ashford, Vermont.</p>
+    <a href="tel:+15550104477">Call (555) 010-4477</a>
+    <a href="mailto:rowan@cedarhollow.example">Email me</a>
+    <a href="mailto:noreply@wixpress.com">site feedback</a>
+  </body>
+</html>

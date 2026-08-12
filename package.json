@@ -1,0 +1,10 @@
+{
+  "name": "practice-studio-clipper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome/Vivaldi extension that clips a therapist's website into a vCard for Practice Studio.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

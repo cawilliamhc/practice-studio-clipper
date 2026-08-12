@@ -1,0 +1,128 @@
+// Popup: scrape the active tab, let Carl correct anything, write the .vcf.
+//
+// The scrape runs from here rather than from a background service worker for
+// two reasons: activeTab's permission is granted by the toolbar click that
+// opened this popup, and blob/data URL creation for the download needs a
+// document context, which a MV3 service worker doesn't have.
+import { buildVCard, displayName, vcardFileName } from "./vcard.js";
+
+const INBOX_SUBFOLDER = "ps-contact-inbox";
+
+const FIELDS = [
+  ["fullName", "Full name"],
+  ["credentials", "Credentials"],
+  ["organization", "Practice / organization"],
+  ["phone", "Phone"],
+  ["email", "Email"],
+  ["website", "Website"],
+  ["specialization", "Specialization"],
+  ["address", "Address"],
+];
+
+const form = document.getElementById("form");
+const saveButton = document.getElementById("save");
+const status = document.getElementById("status");
+const pageUrl = document.getElementById("page-url");
+
+let scraped = null;
+
+function setStatus(message, kind = "") {
+  status.textContent = message;
+  status.className = kind;
+}
+
+function render(fields, sources) {
+  form.replaceChildren();
+  for (const [key, label] of FIELDS) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "field";
+
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const labelEl = document.createElement("label");
+    labelEl.textContent = label;
+    labelEl.htmlFor = `f-${key}`;
+
+    const source = document.createElement("span");
+    const from = sources[key];
+    source.className = from ? "src" : "src empty";
+    source.textContent = from ? `from ${from}` : "not found";
+
+    row.append(labelEl, source);
+
+    const input = document.createElement("input");
+    input.id = `f-${key}`;
+    input.name = key;
+    input.value = fields[key] || "";
+    input.addEventListener("input", refreshSaveState);
+
+    wrapper.append(row, input);
+    form.append(wrapper);
+  }
+}
+
+function currentFields() {
+  const out = {};
+  for (const [key] of FIELDS) out[key] = form.elements[key]?.value.trim() ?? "";
+  return out;
+}
+
+function refreshSaveState() {
+  saveButton.disabled = !currentFields().fullName;
+}
+
+async function scrapeActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) throw new Error("No active tab.");
+  if (/^(chrome|vivaldi|edge|about|chrome-extension):/i.test(tab.url || "")) {
+    throw new Error("This page can't be clipped — open the therapist's site first.");
+  }
+  const [injection] = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ["src/scrape.js"],
+  });
+  if (!injection?.result) throw new Error("Couldn't read that page.");
+  return injection.result;
+}
+
+async function save() {
+  const fields = currentFields();
+  saveButton.disabled = true;
+  setStatus("Saving…");
+  try {
+    const text = buildVCard(fields, {
+      uid: crypto.randomUUID(),
+      sourceUrl: scraped.sourceUrl,
+      scrapedAt: scraped.scrapedAt,
+    });
+    // A data: URL rather than a blob: URL — the popup can be dismissed the
+    // instant the download starts, which would revoke a blob out from under it.
+    const url = `data:text/vcard;charset=utf-8,${encodeURIComponent(text)}`;
+    await chrome.downloads.download({
+      url,
+      filename: `${INBOX_SUBFOLDER}/${vcardFileName(fields)}`,
+      conflictAction: "uniquify",
+      saveAs: false,
+    });
+    setStatus(`Saved ${displayName(fields)} to ${INBOX_SUBFOLDER}/`, "ok");
+  } catch (err) {
+    setStatus(err?.message || "Couldn't save that card.", "err");
+    saveButton.disabled = false;
+  }
+}
+
+saveButton.addEventListener("click", save);
+
+(async () => {
+  try {
+    scraped = await scrapeActiveTab();
+    pageUrl.textContent = scraped.sourceUrl;
+    render(scraped.fields, scraped.sources);
+    refreshSaveState();
+    if (!scraped.fields.fullName) setStatus("No name found — type one to save.", "err");
+  } catch (err) {
+    pageUrl.textContent = "";
+    setStatus(err?.message || "Something went wrong.", "err");
+  }
+})();

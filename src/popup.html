@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Clip therapist contact</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #18181b;
+        --muted: #71717a;
+        --border: #e4e4e7;
+        --field-bg: #ffffff;
+        --accent: #2563eb;
+        --accent-fg: #ffffff;
+        --ok: #15803d;
+        --err: #b91c1c;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #18181b;
+          --fg: #fafafa;
+          --muted: #a1a1aa;
+          --border: #3f3f46;
+          --field-bg: #27272a;
+          --accent: #3b82f6;
+          --ok: #4ade80;
+          --err: #f87171;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        width: 360px;
+        margin: 0;
+        padding: 14px;
+        background: var(--bg);
+        color: var(--fg);
+        font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      h1 {
+        margin: 0 0 2px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .sub {
+        margin: 0 0 12px;
+        color: var(--muted);
+        font-size: 11px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .field { margin-bottom: 9px; }
+      .row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 3px;
+      }
+      label { font-size: 11px; font-weight: 500; }
+      .src {
+        font-size: 10px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .src.empty { font-style: italic; }
+      input {
+        width: 100%;
+        padding: 5px 7px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: var(--field-bg);
+        color: var(--fg);
+        font: inherit;
+      }
+      input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+      button {
+        width: 100%;
+        margin-top: 4px;
+        padding: 7px;
+        border: 0;
+        border-radius: 5px;
+        background: var(--accent);
+        color: var(--accent-fg);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:disabled { opacity: 0.5; cursor: default; }
+      #status { margin-top: 8px; font-size: 11px; min-height: 14px; }
+      #status.ok { color: var(--ok); }
+      #status.err { color: var(--err); }
+      .note {
+        margin-top: 10px;
+        padding-top: 9px;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Clip therapist contact</h1>
+    <p class="sub" id="page-url">Reading page…</p>
+    <form id="form"></form>
+    <button id="save" type="button" disabled>Save to inbox</button>
+    <p id="status" role="status"></p>
+    <p class="note">
+      Saves to <code>Downloads/ps-contact-inbox/</code>, then import it in Practice Studio.
+      Everything is filed as a mental health provider.
+    </p>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

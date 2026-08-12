@@ -46,10 +46,14 @@ describe("buildVCard", () => {
     assert.ok(build({ specialization: "" }).includes("X-CONTACT-TYPE:therapist"));
   });
 
-  test("carries specialization in NOTE as well as X-SPECIALIZATION", () => {
+  test("carries specialization in X-SPECIALIZATION only, not restated in NOTE", () => {
     const card = build();
     assert.ok(card.includes("X-SPECIALIZATION:EMDR\\, adolescent anxiety"));
-    assert.ok(card.includes("Specialization: EMDR\\, adolescent anxiety"));
+    assert.ok(!unfold(card).includes("Specialization: "));
+  });
+
+  test("keeps the address in NOTE, which is the only place it can survive", () => {
+    assert.ok(unfold(build()).includes("Address: 18 Fern Street\\, Suite 4\\, Ashford\\, VT"));
   });
 
   test("records where the card came from", () => {

@@ -3,11 +3,11 @@
 //
 // Two deliberate choices about how much this file trusts the app:
 //
-//   * X-SPECIALIZATION is written, but the specialization ALSO goes into NOTE.
-//     The app's inbox path runs cards through parseVCardRows, which hardcodes
-//     specialization to "" — correct for an address-book export, which has no
-//     such notion, but it would silently drop ours. NOTE survives that path
-//     today; the X- property is there for when the app learns to read it.
+//   * Specialization rides in X-SPECIALIZATION alone. It was duplicated into
+//     NOTE while parseVCardRows still hardcoded specialization to "" — correct
+//     for an address-book export, which has no such notion, but it dropped
+//     ours. The app reads the property directly as of the contact-inbox work,
+//     so the NOTE copy would now just restate a field the contact already has.
 //
 //   * Credentials stay appended to FN rather than riding in a custom property.
 //     The app has no credentials field, and its name matcher already strips
@@ -60,9 +60,9 @@ export function displayName(fields) {
 
 function noteLines(fields, sourceUrl, scrapedAt) {
   const lines = [];
-  const specialization = (fields.specialization || "").trim();
   const address = (fields.address || "").trim();
-  if (specialization) lines.push(`Specialization: ${specialization}`);
+  // Address has no field of its own on a Contact, so unlike specialization it
+  // genuinely needs the note to survive at all.
   if (address) lines.push(`Address: ${address}`);
   if (sourceUrl) {
     const day = scrapedAt ? String(scrapedAt).slice(0, 10) : "";

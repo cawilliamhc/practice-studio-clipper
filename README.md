@@ -8,12 +8,14 @@ Every card is filed as a **mental health provider** (`X-CONTACT-TYPE:therapist`)
 ## Status — step 1 of 4
 
 - [x] **Step 1** — extension skeleton, deterministic scrape, `.vcf` download
-- [ ] **Step 2** — `contactInboxPath` setting + "Import from inbox" in Practice Studio
+- [x] **Step 2** — `contactInboxPath` setting + "Import from inbox" in Practice Studio
 - [ ] **Step 3** — LM Studio normalizer for what the deterministic tiers miss
 - [ ] **Step 4** — clipped-URL history ("you saved this one on 3 Aug")
 
-Until step 2 lands, import the saved file with **Contacts → Import vCard…** in Practice
-Studio and point it at `~/Downloads/ps-contact-inbox/`.
+**One-time setup:** in Practice Studio, open **Contacts → settings → Contact inbox folder**,
+choose `~/Downloads/ps-contact-inbox`, and save. "Import from inbox" then appears in the
+same panel and reviews everything waiting there in one pass. Imported cards move to an
+`_imported` folder inside the inbox rather than being deleted.
 
 ## Installing
 
@@ -31,6 +33,7 @@ Reload the extension from that page after editing any file.
 3. Check the fields — each shows where it came from (`from json-ld`, `from tel: link`,
    `not found`), and every one is editable
 4. **Save to inbox** → `~/Downloads/ps-contact-inbox/rowan-aldridge-lcsw.vcf`
+5. In Practice Studio: **Contacts → settings → Import from inbox**
 
 Same-name files get a numeric suffix rather than overwriting. Practice Studio's importer
 matches on name and only fills blank fields, so re-clipping someone updates rather than
@@ -64,14 +67,13 @@ Platform noise (`@wixpress.com`, `@squarespace.com`) is filtered out of email ca
 | Phone | `TEL;TYPE=WORK` | `phone` |
 | Email | `EMAIL;TYPE=INTERNET` | `email` |
 | Website | `URL` | `website` |
-| Specialization | `X-SPECIALIZATION` **and** `NOTE` | `notes` (see below) |
-| Address | `NOTE` | `notes` |
+| Specialization | `X-SPECIALIZATION` | `specialization` |
+| Address | `NOTE` | `notes` — a Contact has no address field, so the note is the only place it survives |
 | — | `X-CONTACT-TYPE:therapist` | set by the import dialog's dropdown, which already defaults to therapist |
 
-Specialization is written twice on purpose. Practice Studio's `parseVCardRows` hardcodes
+Specialization was duplicated into `NOTE` until step 2, because `parseVCardRows` hardcoded
 `specialization: ""` — correct for an address-book export, which has no such concept, but it
-would silently drop ours. `NOTE` survives that path today; the `X-` property is there for
-when step 2 teaches the importer to read it.
+dropped ours. The importer now reads the property directly, so the note copy is gone.
 
 ## Icons
 

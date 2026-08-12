@@ -85,6 +85,13 @@ describe("Practice Studio reads what the clipper writes", { skip: !available && 
     assert.equal(parsed.specialization, specialization);
   });
 
+  test("the app reads the headshot reference back as a sibling filename", () => {
+    const parsed = parseVCard(
+      buildVCard({ fullName: "Ines Vaughn", credentials: "PsyD" }, { uid: "ghi-789", photoFileName: "ines-vaughn-psyd.jpg" })
+    );
+    assert.equal(parsed.photoFileName, "ines-vaughn-psyd.jpg");
+  });
+
   test("several clipped cards concatenate into one importable file", () => {
     const one = buildVCard({ fullName: "Devi Ramanathan", credentials: "LPC" }, { uid: "u1" });
     const two = buildVCard({ fullName: "Soren Blackwell", credentials: "LCSW" }, { uid: "u2" });

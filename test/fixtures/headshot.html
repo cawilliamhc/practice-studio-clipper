@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- Fixture for headshot picking. The page offers three images and only one
+     is the person: a wide banner, a square logo, and a portrait-ish photo
+     whose alt text names her. The logo is square and reasonably large, so a
+     naive "biggest square image" rule picks the wrong one.
+     Every name here is invented. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Ines Vaughn, PsyD | Harbor Psychology</title>
+    <meta property="og:image" content="/test/fixtures/img-logo.png" />
+  </head>
+  <body>
+    <img src="/test/fixtures/img-banner.png" alt="Ocean at dawn" class="hero-banner" />
+    <img src="/test/fixtures/img-logo.png" alt="Harbor Psychology" class="site-logo" />
+    <main>
+      <h1>Ines Vaughn, PsyD</h1>
+      <img src="/test/fixtures/img-headshot.png" alt="Ines Vaughn" class="bio-portrait" />
+      <p>Clinical psychologist working with adults in Ashford.</p>
+      <p><a href="mailto:ines@harbor.example">ines@harbor.example</a></p>
+    </main>
+  </body>
+</html>

@@ -1,6 +1,15 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { buildVCard, displayName, escapeText, foldLine, slugify, vcardFileName } from "../src/vcard.js";
+import {
+  buildVCard,
+  displayName,
+  escapeText,
+  foldLine,
+  photoExtension,
+  photoFileName,
+  slugify,
+  vcardFileName,
+} from "../src/vcard.js";
 
 const UID = "00000000-0000-4000-8000-000000000001";
 
@@ -76,6 +85,43 @@ describe("buildVCard", () => {
 
   test("refuses a card with no name", () => {
     assert.throws(() => build({ fullName: "", credentials: "" }), /needs a name/);
+  });
+});
+
+describe("headshots", () => {
+  test("references the image as a bare sibling filename", () => {
+    const card = buildVCard(SAMPLE, { uid: UID, photoFileName: "rowan-aldridge-lcsw.jpg" });
+    assert.ok(card.includes("PHOTO;VALUE=uri:rowan-aldridge-lcsw.jpg"));
+  });
+
+  test("writes no PHOTO line when no image was saved", () => {
+    assert.ok(!build().includes("PHOTO"));
+    assert.ok(!buildVCard(SAMPLE, { uid: UID, photoFileName: "   " }).includes("PHOTO"));
+  });
+
+  test("names the image to match the card", () => {
+    assert.equal(vcardFileName(SAMPLE), "rowan-aldridge-lcsw.vcf");
+    assert.equal(photoFileName(SAMPLE, "https://x.test/a.jpg"), "rowan-aldridge-lcsw.jpg");
+  });
+
+  test("prefers the served content type over the URL's extension", () => {
+    assert.equal(photoExtension("https://x.test/photo.jpg", "image/png"), ".png");
+    assert.equal(photoExtension("https://x.test/photo", "image/webp; charset=binary"), ".webp");
+  });
+
+  test("falls back to the URL extension, ignoring query strings", () => {
+    assert.equal(photoExtension("https://x.test/photo.PNG?w=400"), ".png");
+    assert.equal(photoExtension("https://x.test/photo.jpeg"), ".jpg");
+  });
+
+  test("reads the extension off a relative URL, which has no parseable base", () => {
+    assert.equal(photoExtension("/assets/img-headshot.png"), ".png");
+    assert.equal(photoExtension("../photos/me.webp?v=2"), ".webp");
+  });
+
+  test("guesses jpg when nothing says otherwise", () => {
+    assert.equal(photoExtension("https://x.test/image-handler?id=9"), ".jpg");
+    assert.equal(photoExtension("not a url"), ".jpg");
   });
 });
 

@@ -78,7 +78,7 @@ function noteLines(fields, sourceUrl, scrapedAt) {
  * crypto.randomUUID(). Writing a UID at all matters because the app mints a
  * fresh random one on every folder scan for cards that lack it.
  */
-export function buildVCard(fields, { uid, sourceUrl = "", scrapedAt = "" } = {}) {
+export function buildVCard(fields, { uid, sourceUrl = "", scrapedAt = "", photoFileName = "" } = {}) {
   const name = displayName(fields);
   if (!name) throw new Error("A contact needs a name.");
 
@@ -99,6 +99,12 @@ export function buildVCard(fields, { uid, sourceUrl = "", scrapedAt = "" } = {})
   // corrupt the link rather than protect it.
   if ((fields.website || "").trim()) lines.push(`URL:${fields.website.trim()}`);
 
+  // A bare sibling filename, not a URI — the app resolves it against the
+  // folder the card was read from, and rejects anything with a path
+  // separator or scheme in it. Written only once the image is actually on
+  // disk, so a card never points at a headshot that isn't there.
+  if (photoFileName.trim()) lines.push(`PHOTO;VALUE=uri:${photoFileName.trim()}`);
+
   const notes = noteLines(fields, sourceUrl, scrapedAt);
   if (notes.length) lines.push(`NOTE:${escapeText(notes.join("\n"))}`);
 
@@ -113,4 +119,36 @@ export function buildVCard(fields, { uid, sourceUrl = "", scrapedAt = "" } = {})
 /** Filename for the inbox drop, e.g. "rowan-aldridge-lcsw.vcf". */
 export function vcardFileName(fields) {
   return `${slugify(displayName(fields))}.vcf`;
+}
+
+const EXTENSION_BY_TYPE = {
+  "image/jpeg": ".jpg",
+  "image/jpg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+  "image/avif": ".avif",
+};
+
+/** Content type first, then the URL's own extension, then a plain guess —
+ *  the app only accepts a known image extension, so there has to be one. */
+export function photoExtension(url, contentType = "") {
+  const byType = EXTENSION_BY_TYPE[String(contentType).split(";")[0].trim().toLowerCase()];
+  if (byType) return byType;
+  // A relative URL can't be parsed without a base, so fall back to trimming
+  // the query and fragment off by hand rather than giving up on the path.
+  let path;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+    path = String(url ?? "").split(/[?#]/)[0];
+  }
+  const match = path.match(/\.(jpe?g|png|webp|gif|avif)$/i);
+  if (match) return `.${match[1].toLowerCase()}`.replace(".jpeg", ".jpg");
+  return ".jpg";
+}
+
+/** Headshot filename, matching the card's stem so the pair reads as a pair. */
+export function photoFileName(fields, url, contentType = "") {
+  return `${slugify(displayName(fields))}${photoExtension(url, contentType)}`;
 }

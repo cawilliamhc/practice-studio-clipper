@@ -45,6 +45,7 @@
           website: "https://example.test/colin",
           specialization: "",
           address: "",
+          photoUrl: "/test/fixtures/img-headshot.png",
         },
         sources: {
           fullName: "page heading",
@@ -55,12 +56,14 @@
           website: "address bar",
           specialization: "",
           address: "",
+          photoUrl: "page image",
         },
         sourceUrl: "https://example.test/colin",
         scrapedAt: new Date().toISOString(),
         pageText,
       };
 
+      const downloaded = [];
       let stored = { useLocalModel: true };
       globalThis.chrome = {
         storage: {
@@ -77,9 +80,21 @@
         downloads: {
           download: async (opts) => {
             log("downloads.download", opts.filename);
-            log(decodeURIComponent(opts.url.split(",")[1]));
-            return 1;
+            // Only the .vcf is a data: URL; the headshot is a remote URL.
+            if (opts.url.startsWith("data:")) log(decodeURIComponent(opts.url.split(",")[1]));
+            downloaded.push(opts.filename);
+            return downloaded.length;
           },
+          // Chrome uniquifies a colliding name, so the harness returns a
+          // different filename than the one asked for — the popup has to use
+          // what came back, not what it requested.
+          search: async ({ id }) => [
+            {
+              id,
+              state: "complete",
+              filename: `/Users/someone/Downloads/${downloaded[id - 1]}`.replace(/(\.[^.]+)$/, " (1)$1"),
+            },
+          ],
         },
       };
 

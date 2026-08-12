@@ -53,6 +53,32 @@ it:
 Phone and email are never inferred from prose beyond that last conservative step. Platform
 noise (`@wixpress.com`, `@squarespace.com`) is filtered out of email candidates.
 
+## Headshots
+
+When the page offers a portrait, the popup shows it with a **Don't include** link. Saving
+writes the image into the inbox next to the card, and the card points at it by bare filename
+— the same sibling-file convention Practice Studio uses for its own contact photos, so the
+importer copies it into the contacts folder on the way in.
+
+Three tiers, in order:
+
+1. **JSON-LD** `image` on the `Person` node — never the organization's, which is usually the
+   practice logo
+2. **A scan of the page's images**, scoring each on whether its alt text or class names the
+   person, whether it reads as a portrait (`headshot`, `bio`, `avatar`…), whether it's
+   roughly square or a little taller than wide, and how early it appears. Anything named
+   like a logo, badge, or banner is rejected outright, as is anything under 80px or wildly
+   out of portrait proportion.
+3. **`og:image`** last, because it's so often a logo or a social share card
+
+The image is downloaded before the card is written, and the card references the filename the
+download *actually* landed under — Chrome uniquifies a name that collides, so asking for
+`jane.jpg` can produce `jane (1).jpg`, and a card naming the wrong one points at nothing. If
+the image can't be saved, the contact still is; the status line says so.
+
+A photo fills only where blank on import. Re-clipping never replaces a headshot you already
+have.
+
 ## The local model
 
 Tick **Fill gaps with the local model** and anything the tiers left blank goes to LM Studio
@@ -117,6 +143,7 @@ the browser.
 | Website | `URL` | `website` |
 | Specialization | `X-SPECIALIZATION` | `specialization` |
 | Address | `NOTE` | `notes` — a Contact has no address field, so the note is the only place it survives |
+| Headshot | `PHOTO;VALUE=uri` — a bare sibling filename | `photoFileName`, copied into the contacts folder on import |
 | — | `X-CONTACT-TYPE:therapist` | set by the import dialog's dropdown, which already defaults to therapist |
 
 Specialization was duplicated into `NOTE` until step 2, because `parseVCardRows` hardcoded
@@ -183,7 +210,11 @@ extension.
   ride in the contact's display name, so a wrong one is worse than a blank — but it does mean
   typing the odd credential in by hand.
 - Group-practice pages listing several therapists yield only the first one. One page, one
-  card, for now.
+  card, for now. This is also where headshot picking is least reliable — a team page full of
+  portraits gives the scorer little to separate them beyond alt text.
+- Headshot scoring is heuristic and deliberately timid. A miss leaves the field blank and
+  visible rather than attaching a stranger's face to a colleague's record, which is why the
+  popup shows the picture rather than describing it.
 - The inbox folder is fixed at `Downloads/ps-contact-inbox` (`INBOX_SUBFOLDER` in
   `src/popup.js`). Chrome's downloads API can't write outside Downloads; step 2 can switch
   to the File System Access API if writing straight into the Drive tree is worth the

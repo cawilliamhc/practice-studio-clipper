@@ -105,6 +105,15 @@
     return "";
   }
 
+  /** schema.org `image` is a string, an ImageObject, or an array of either. */
+  function imageUrl(value) {
+    if (!value) return "";
+    if (typeof value === "string") return clean(value);
+    if (Array.isArray(value)) return imageUrl(value.find(Boolean));
+    if (typeof value === "object") return clean(value.url || value.contentUrl || "");
+    return "";
+  }
+
   function listOf(value) {
     if (!value) return [];
     const items = Array.isArray(value) ? value : [value];
@@ -136,6 +145,9 @@
       website: firstString(primary.url),
       specialization: [...new Set(specialization)].join(", "),
       address: formatAddress(primary.address),
+      // Only ever a Person's own image. An organization's `image` is very
+      // often the practice logo, which is not a headshot.
+      photoUrl: person ? imageUrl(person.image) : "",
     };
   }
 
@@ -153,6 +165,7 @@
     return {
       fullName: stripTagline(meta('meta[property="og:title"]') || document.title),
       organization: meta('meta[property="og:site_name"]'),
+      photoUrl: meta('meta[property="og:image"]'),
     };
   }
 
@@ -211,6 +224,75 @@
     return match ? clean(match[0]) : "";
   }
 
+  // ---- headshot -----------------------------------------------------------
+
+  // Words that mark an image as furniture rather than a person.
+  const NOT_A_PERSON = /logo|icon|badge|seal|banner|sprite|favicon|placeholder|background|pattern|divider|arrow|button/i;
+  // Words that mark one as likely to be the person.
+  const LOOKS_LIKE_PORTRAIT = /headshot|portrait|profile|bio|avatar|photo|team|staff|about|therapist|counselor|counsellor|founder|me\b/i;
+
+  /** Lowercased words, punctuation flattened to spaces — for loose token
+   *  matching against alt text and class names. */
+  const wordsOf = (value) => clean(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  const absoluteUrl = (value) => {
+    if (!value) return "";
+    try {
+      const url = new URL(value, document.baseURI);
+      return /^https?:$/.test(url.protocol) ? url.toString() : "";
+    } catch {
+      return "";
+    }
+  };
+
+  function imageDimensions(img) {
+    const width = img.naturalWidth || Number(img.getAttribute("width")) || img.clientWidth || 0;
+    const height = img.naturalHeight || Number(img.getAttribute("height")) || img.clientHeight || 0;
+    return { width, height };
+  }
+
+  /**
+   * Scores every image on the page and takes the best, if any clears the bar.
+   *
+   * The signals are deliberately dull: portraits are reasonably large, close
+   * to square or a little taller than wide, described with the person's name
+   * or a word like "headshot", and near the top of the page. Nothing here is
+   * clever enough to be confidently wrong — a miss leaves the field blank and
+   * visible in the popup, which beats attaching a stranger's face to a
+   * colleague's record.
+   */
+  function findHeadshot(personName) {
+    const nameTokens = wordsOf(personName).split(" ").filter((t) => t.length > 2);
+    let best = null;
+
+    for (const img of document.images) {
+      const src = absoluteUrl(img.currentSrc || img.src);
+      if (!src) continue;
+      const { width, height } = imageDimensions(img);
+      if (width < 80 || height < 80) continue; // spacers, icons, tracking pixels
+
+      const describedBy = `${img.alt || ""} ${img.className || ""} ${img.id || ""} ${src}`;
+      if (NOT_A_PERSON.test(describedBy)) continue;
+
+      const ratio = width / height;
+      if (ratio < 0.5 || ratio > 1.9) continue; // banners and slivers aren't headshots
+
+      let score = 0;
+      const described = wordsOf(describedBy);
+      if (nameTokens.length > 0 && nameTokens.every((t) => described.includes(t))) score += 5;
+      if (LOOKS_LIKE_PORTRAIT.test(describedBy)) score += 3;
+      if (ratio >= 0.7 && ratio <= 1.3) score += 2; // square-ish
+      if (width >= 200 && height >= 200) score += 1;
+      // Earlier in the document is likelier to be the subject of the page.
+      const position = [...document.images].indexOf(img);
+      if (position <= 2) score += 1;
+
+      if (score > 0 && (!best || score > best.score)) best = { src, score };
+    }
+
+    return best ? best.src : "";
+  }
+
   // ---- assembly -----------------------------------------------------------
 
   /** First non-empty candidate wins; remembers which tier supplied it. */
@@ -250,6 +332,14 @@
     website: pick([["json-ld", ld.website], ["canonical", canonical], ["address bar", location.href]]),
     specialization: pick([["json-ld", ld.specialization]]),
     address: pick([["json-ld", ld.address]]),
+    // og:image ranks below the page scan on purpose: it's frequently a logo
+    // or a social share card, whereas the scan rejects logo-ish images and
+    // insists on portrait-ish dimensions before offering anything.
+    photoUrl: pick([
+      ["json-ld", absoluteUrl(ld.photoUrl)],
+      ["page image", findHeadshot(split.name)],
+      ["og:image", absoluteUrl(mt.photoUrl)],
+    ]),
   };
 
   const fields = {
@@ -261,6 +351,7 @@
     website: chosen.website.value,
     specialization: chosen.specialization.value,
     address: chosen.address.value,
+    photoUrl: chosen.photoUrl.value,
   };
 
   const sources = {
@@ -272,6 +363,7 @@
     website: chosen.website.source,
     specialization: chosen.specialization.source,
     address: chosen.address.source,
+    photoUrl: chosen.photoUrl.source,
   };
 
   return {

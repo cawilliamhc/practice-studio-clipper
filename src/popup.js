@@ -4,7 +4,7 @@
 // two reasons: activeTab's permission is granted by the toolbar click that
 // opened this popup, and blob/data URL creation for the download needs a
 // document context, which a MV3 service worker doesn't have.
-import { buildVCard, displayName, vcardFileName } from "./vcard.js";
+import { buildVCard, displayName, photoFileName, vcardFileName } from "./vcard.js";
 import { normalizeWithLocalModel } from "./llm.js";
 import {
   describePriorClip,
@@ -34,9 +34,15 @@ const status = document.getElementById("status");
 const pageUrl = document.getElementById("page-url");
 const useModel = document.getElementById("use-model");
 const prior = document.getElementById("prior");
+const photoBlock = document.getElementById("photo");
+const photoImg = document.getElementById("photo-img");
+const photoSrc = document.getElementById("photo-src");
+const photoClear = document.getElementById("photo-clear");
 
 let scraped = null;
 let clipHistory = [];
+/** The headshot to save, or null once cleared or if none was found. */
+let photoUrl = null;
 
 function setStatus(message, kind = "") {
   status.textContent = message;
@@ -89,6 +95,62 @@ function refreshSaveState() {
   saveButton.disabled = !currentFields().fullName;
 }
 
+/** Offers the headshot for review. A picture is the one field worth showing
+ *  rather than describing — the wrong face is obvious at a glance and
+ *  invisible as a URL. An image that won't load is dropped silently, since a
+ *  broken preview is worse than none. */
+function showPhoto(url, source) {
+  photoUrl = url || null;
+  if (!photoUrl) {
+    photoBlock.hidden = true;
+    return;
+  }
+  photoImg.onerror = () => {
+    photoUrl = null;
+    photoBlock.hidden = true;
+  };
+  photoImg.src = photoUrl;
+  photoSrc.textContent = source ? `from ${source}` : "";
+  photoBlock.hidden = false;
+}
+
+photoClear.addEventListener("click", () => showPhoto(null));
+
+/**
+ * Saves the headshot beside the card and reports the name it actually landed
+ * under — Chrome uniquifies a colliding filename, so the name asked for and
+ * the name on disk are not always the same, and the card has to reference
+ * the real one or it points at nothing.
+ *
+ * Returns null if the image can't be saved, which is not a failure worth
+ * losing the contact over.
+ */
+async function savePhoto(fields) {
+  if (!photoUrl) return null;
+  try {
+    const wanted = photoFileName(fields, photoUrl);
+    const id = await chrome.downloads.download({
+      url: photoUrl,
+      filename: `${INBOX_SUBFOLDER}/${wanted}`,
+      conflictAction: "uniquify",
+      saveAs: false,
+    });
+    for (let attempt = 0; attempt < 15; attempt++) {
+      const [item] = await chrome.downloads.search({ id });
+      if (item?.state === "interrupted") return null;
+      if (item?.state === "complete" && item.filename) {
+        return item.filename.split(/[\\/]/).pop() || null;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    // Still downloading: a large image is fine, and the app skips a PHOTO
+    // whose file isn't there when the import runs.
+    return wanted;
+  } catch {
+    return null;
+  }
+}
+
 /** Shows whether this page — or this person — has been clipped before. Purely
  *  informational: re-clipping updates rather than duplicates on import. */
 function refreshPriorNotice() {
@@ -118,10 +180,14 @@ async function save() {
   saveButton.disabled = true;
   setStatus("Saving…");
   try {
+    // The image goes first: the card must reference a filename that exists,
+    // and only the finished download knows what that is.
+    const savedPhoto = await savePhoto(fields);
     const text = buildVCard(fields, {
       uid: crypto.randomUUID(),
       sourceUrl: scraped.sourceUrl,
       scrapedAt: scraped.scrapedAt,
+      photoFileName: savedPhoto || "",
     });
     // A data: URL rather than a blob: URL — the popup can be dismissed the
     // instant the download starts, which would revoke a blob out from under it.
@@ -139,7 +205,8 @@ async function save() {
     });
     await saveClipHistory(clipHistory);
     refreshPriorNotice();
-    setStatus(`Saved ${displayName(fields)} to ${INBOX_SUBFOLDER}/`, "ok");
+    const photoNote = photoUrl && !savedPhoto ? " (headshot couldn't be saved)" : "";
+    setStatus(`Saved ${displayName(fields)} to ${INBOX_SUBFOLDER}/${photoNote}`, photoNote ? "" : "ok");
   } catch (err) {
     setStatus(err?.message || "Couldn't save that card.", "err");
     saveButton.disabled = false;
@@ -209,6 +276,7 @@ useModel.addEventListener("change", async () => {
     scraped = await scrapeActiveTab();
     pageUrl.textContent = scraped.sourceUrl;
     render(scraped.fields, scraped.sources);
+    showPhoto(scraped.fields.photoUrl, scraped.sources.photoUrl);
     refreshSaveState();
     refreshPriorNotice();
     if (!scraped.fields.fullName) setStatus("No name found — type one to save.", "err");

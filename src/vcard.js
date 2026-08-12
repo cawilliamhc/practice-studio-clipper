@@ -58,16 +58,16 @@ export function displayName(fields) {
   return credentials ? `${name}, ${credentials}` : name;
 }
 
-function noteLines(fields, sourceUrl, scrapedAt) {
+// NOTE carries only what has nowhere else to go. A "clipped from <url> on
+// <date>" line used to ride along here too, but provenance every contact
+// keeps forever is clutter in the record, and the URL is already on the
+// contact as its website.
+function noteLines(fields) {
   const lines = [];
   const address = (fields.address || "").trim();
   // Address has no field of its own on a Contact, so unlike specialization it
   // genuinely needs the note to survive at all.
   if (address) lines.push(`Address: ${address}`);
-  if (sourceUrl) {
-    const day = scrapedAt ? String(scrapedAt).slice(0, 10) : "";
-    lines.push(day ? `Clipped from ${sourceUrl} on ${day}` : `Clipped from ${sourceUrl}`);
-  }
   return lines;
 }
 
@@ -78,7 +78,7 @@ function noteLines(fields, sourceUrl, scrapedAt) {
  * crypto.randomUUID(). Writing a UID at all matters because the app mints a
  * fresh random one on every folder scan for cards that lack it.
  */
-export function buildVCard(fields, { uid, sourceUrl = "", scrapedAt = "", photoFileName = "" } = {}) {
+export function buildVCard(fields, { uid, photoFileName = "" } = {}) {
   const name = displayName(fields);
   if (!name) throw new Error("A contact needs a name.");
 
@@ -105,7 +105,7 @@ export function buildVCard(fields, { uid, sourceUrl = "", scrapedAt = "", photoF
   // disk, so a card never points at a headshot that isn't there.
   if (photoFileName.trim()) lines.push(`PHOTO;VALUE=uri:${photoFileName.trim()}`);
 
-  const notes = noteLines(fields, sourceUrl, scrapedAt);
+  const notes = noteLines(fields);
   if (notes.length) lines.push(`NOTE:${escapeText(notes.join("\n"))}`);
 
   // Every card this extension writes is a mental health provider.

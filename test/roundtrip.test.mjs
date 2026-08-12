@@ -37,7 +37,7 @@ describe("Practice Studio reads what the clipper writes", { skip: !available && 
         specialization: "Couples work; perinatal",
         address: "9 Larkspur Ave, Ashford, VT",
       },
-      { uid: "abc-123", sourceUrl: "https://northgate.example/team/mira", scrapedAt: "2026-08-12T00:00:00.000Z" }
+      { uid: "abc-123" }
     );
 
   test("core fields survive the round trip", () => {
@@ -63,22 +63,20 @@ describe("Practice Studio reads what the clipper writes", { skip: !available && 
     assert.doesNotMatch(parsed.notes, /Specialization:/);
   });
 
-  test("provenance and address reach the notes field", () => {
+  test("the address reaches the notes field, and nothing else does", () => {
     const notes = parseVCard(card()).notes;
-    assert.match(notes, /Address: 9 Larkspur Ave, Ashford, VT/);
-    assert.match(notes, /Clipped from https:\/\/northgate\.example\/team\/mira on 2026-08-12/);
-    assert.match(notes, /\n/, "note lines unescape to real newlines");
+    assert.equal(notes, "Address: 9 Larkspur Ave, Ashford, VT");
   });
 
   test("long folded values unfold back to the original text", () => {
-    // Both a long NOTE (address plus provenance) and a long property value
-    // wrap past the 75-char fold, and both have to survive the trip.
+    // Both a long NOTE and a long property value wrap past the 75-char fold,
+    // and both have to survive the trip.
     const address = "Suite 300, " + "1600 Longmeadow Boulevard East, ".repeat(3) + "Ashford, VT";
     const specialization = "trauma, attachment, grief work, and perinatal mental health".repeat(2);
     const parsed = parseVCard(
       buildVCard(
         { fullName: "Ines Vaughn", credentials: "PsyD", address, specialization },
-        { uid: "def-456", sourceUrl: "https://example.test/ines", scrapedAt: "2026-08-12T00:00:00.000Z" }
+        { uid: "def-456" }
       )
     );
     assert.ok(parsed.notes.includes(address), "folded NOTE reassembled intact");

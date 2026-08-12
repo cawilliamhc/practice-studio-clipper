@@ -185,8 +185,6 @@ async function save() {
     const savedPhoto = await savePhoto(fields);
     const text = buildVCard(fields, {
       uid: crypto.randomUUID(),
-      sourceUrl: scraped.sourceUrl,
-      scrapedAt: scraped.scrapedAt,
       photoFileName: savedPhoto || "",
     });
     // A data: URL rather than a blob: URL — the popup can be dismissed the

@@ -27,11 +27,7 @@ const SAMPLE = {
 /** Rejoins folded continuation lines, the way any vCard reader does. */
 const unfold = (card) => card.replace(/\r\n /g, "");
 
-const build = (overrides = {}) =>
-  buildVCard(
-    { ...SAMPLE, ...overrides },
-    { uid: UID, sourceUrl: "https://cedarhollow.example/about", scrapedAt: "2026-08-12T14:03:00.000Z" }
-  );
+const build = (overrides = {}) => buildVCard({ ...SAMPLE, ...overrides }, { uid: UID });
 
 describe("buildVCard", () => {
   test("emits a well-formed card with CRLF line endings", () => {
@@ -65,10 +61,16 @@ describe("buildVCard", () => {
     assert.ok(unfold(build()).includes("Address: 18 Fern Street\\, Suite 4\\, Ashford\\, VT"));
   });
 
-  test("records where the card came from", () => {
-    // Unfold first: a NOTE this long wraps, so the provenance line is split
-    // across continuations in the raw text.
-    assert.ok(unfold(build()).includes("Clipped from https://cedarhollow.example/about on 2026-08-12"));
+  test("records nothing about where the card came from", () => {
+    // Provenance every contact keeps forever is clutter in the record, and
+    // the page URL is already on the contact as its website.
+    const card = unfold(build());
+    assert.ok(!card.includes("Clipped from"));
+    assert.ok(!card.includes("cedarhollow.example/about") || card.includes("URL:https://cedarhollow.example/about"));
+  });
+
+  test("writes no NOTE at all when there's no address", () => {
+    assert.ok(!build({ address: "" }).includes("NOTE"));
   });
 
   test("leaves the URL unescaped so the link stays usable", () => {

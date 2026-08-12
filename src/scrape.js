@@ -295,6 +295,33 @@
     return match ? clean(match[0]) : "";
   }
 
+  // ---- location -----------------------------------------------------------
+
+  const STATE_ABBREVIATIONS =
+    "AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC";
+  const STATE_NAMES =
+    "Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming|District of Columbia";
+
+  // "Ashford, VT" / "Ashford, Vermont" / "New Haven, CT" — a capitalised
+  // place followed by a state. The comma does most of the work: it's what
+  // separates a real location from two ordinary words in a sentence.
+  const CITY_STATE = new RegExp(
+    `\\b([A-Z][a-z]+(?:[ -][A-Z][a-z]+){0,2}),\\s*(${STATE_ABBREVIATIONS}|${STATE_NAMES})\\b`
+  );
+
+  /** A street address the page marked up as one. */
+  function addressElement() {
+    const el = document.querySelector("address");
+    return el ? clean(el.innerText || el.textContent || "") : "";
+  }
+
+  /** Falls back to the first "City, State" in the copy — enough to know where
+   *  someone practises, which is what a referral directory needs. */
+  function locationFromText(pageText) {
+    const match = pageText.match(CITY_STATE);
+    return match ? `${match[1]}, ${match[2]}` : "";
+  }
+
   // ---- headshot -----------------------------------------------------------
 
   // Words that mark an image as furniture rather than a person.
@@ -364,6 +391,88 @@
     return best ? best.src : "";
   }
 
+  // ---- tags ---------------------------------------------------------------
+
+  // A closed vocabulary, matched literally against the page copy. Closed on
+  // purpose: every tag becomes a contact group in Practice Studio, and
+  // free-form phrases would breed a hundred one-off groups. Nothing here is
+  // generated — if the words aren't on the page, the tag isn't applied.
+  //
+  // Entries are deliberately limited to terms whose mere mention is
+  // meaningful. "Insurance" and "Medicare" are left out: "I don't accept
+  // insurance" is as common as the opposite, and a plain match can't tell.
+  const TAG_VOCABULARY = [
+    // Modalities
+    ["EMDR", /\bEMDR\b/i],
+    ["Internal Family Systems", /\b(?:IFS|internal family systems)\b/i],
+    ["CBT", /\b(?:CBT|cognitive[ -]behaviou?ral)\b/i],
+    ["DBT", /\b(?:DBT|dialectical behaviou?r)/i],
+    ["ACT", /\bacceptance and commitment\b/i],
+    ["Somatic", /\bsomatic(?:\s+experiencing)?\b/i],
+    ["Sensorimotor", /\bsensorimotor\b/i],
+    ["Brainspotting", /\bbrainspotting\b/i],
+    ["AEDP", /\bAEDP\b/i],
+    ["Emotionally Focused", /\b(?:EFT|emotionally[ -]focused)\b/i],
+    ["Gottman", /\bgottman\b/i],
+    ["Play Therapy", /\bplay therapy\b/i],
+    ["Art Therapy", /\bart therapy\b/i],
+    ["Psychodynamic", /\bpsychodynamic\b/i],
+    ["Psychoanalytic", /\bpsychoanaly(?:sis|tic)\b/i],
+    ["Narrative Therapy", /\bnarrative therapy\b/i],
+    ["Solution-Focused", /\bsolution[ -]focused\b/i],
+    ["Mindfulness", /\bmindfulness\b/i],
+    ["Motivational Interviewing", /\bmotivational interviewing\b/i],
+    ["Gestalt", /\bgestalt\b/i],
+    ["Jungian", /\bjungian\b/i],
+    ["Ketamine-Assisted", /\bketamine[ -]assisted\b/i],
+    ["Psychedelic-Assisted", /\bpsychedelic[ -]assisted\b/i],
+    // Who they see
+    ["Children", /\b(?:children|child therapy)\b/i],
+    ["Adolescents", /\b(?:adolescen|teens?\b|teenagers)/i],
+    ["Adults", /\badults\b/i],
+    ["Older Adults", /\b(?:older adults|geriatric|seniors)\b/i],
+    ["Couples", /\bcouples\b/i],
+    ["Families", /\bfamily therapy|families\b/i],
+    ["Groups", /\bgroup therapy\b/i],
+    ["LGBTQIA+", /\b(?:LGBTQ|queer[- ]affirm|gender[- ]affirm)/i],
+    ["Veterans", /\bveterans\b/i],
+    ["Perinatal", /\b(?:perinatal|postpartum|maternal mental health)\b/i],
+    // What they work with
+    ["Trauma", /\b(?:trauma|PTSD)\b/i],
+    ["Anxiety", /\banxiety\b/i],
+    ["Depression", /\bdepression\b/i],
+    ["Grief", /\b(?:grief|bereavement)\b/i],
+    ["Eating Disorders", /\b(?:eating disorder|anorexia|bulimia|binge eating)\b/i],
+    ["OCD", /\b(?:OCD|obsessive[- ]compulsive)\b/i],
+    ["ADHD", /\bADHD\b/i],
+    ["Autism", /\b(?:autis|neurodiverg)/i],
+    ["Substance Use", /\b(?:substance use|addiction|recovery from|alcoholism)\b/i],
+    ["Chronic Illness", /\bchronic (?:illness|pain)\b/i],
+    ["Attachment", /\battachment\b/i],
+    ["Burnout", /\bburnout\b/i],
+    ["Divorce", /\b(?:divorce|separation)\b/i],
+    ["Infertility", /\b(?:infertility|pregnancy loss)\b/i],
+    // How they work
+    ["Telehealth", /\b(?:telehealth|teletherapy|virtual sessions|online therapy)\b/i],
+    ["Sliding Scale", /\bsliding scale\b/i],
+    ["Supervision", /\b(?:clinical supervision|supervisor)\b/i],
+    ["Walk-and-Talk", /\bwalk[ -]and[ -]talk\b/i],
+    ["Intensives", /\bintensives?\b/i],
+  ];
+
+  const MAX_TAGS = 10;
+
+  /** Vocabulary terms the page actually uses, in vocabulary order so the same
+   *  page always yields the same list. */
+  function tagsFromText(text) {
+    const found = [];
+    for (const [name, pattern] of TAG_VOCABULARY) {
+      if (pattern.test(text)) found.push(name);
+      if (found.length >= MAX_TAGS) break;
+    }
+    return found;
+  }
+
   // ---- assembly -----------------------------------------------------------
 
   /** First non-empty candidate wins; remembers which tier supplied it. */
@@ -375,10 +484,14 @@
     return { value: "", source: "" };
   }
 
-  const pageText = clean(document.body?.innerText || "").slice(0, MAX_PAGE_TEXT);
+  // Pattern matching reads the whole page — a phone number or a city in the
+  // footer is still a phone number or a city. Only the model's slice is
+  // capped, because that one costs tokens.
+  const fullText = clean(document.body?.innerText || "");
+  const pageText = fullText.slice(0, MAX_PAGE_TEXT);
   const ld = fromJsonLd();
   const mt = fromMeta();
-  const dom = fromDom(pageText);
+  const dom = fromDom(fullText);
   const canonical = document.querySelector('link[rel="canonical"]')?.href || "";
 
   // The name is resolved first: credentials are split off whichever string
@@ -400,11 +513,16 @@
       ["site name", mt.organization],
       ["page title", orgFromTitle(split.name)],
     ]),
-    phone: pick([["json-ld", ld.phone], ["tel: link", dom.phone], ["page text", phoneFromText(pageText)]]),
+    phone: pick([["json-ld", ld.phone], ["tel: link", dom.phone], ["page text", phoneFromText(fullText)]]),
     email: pick([["json-ld", ld.email], ["mailto: link", dom.email]]),
     website: pick([["json-ld", ld.website], ["canonical", canonical], ["address bar", location.href]]),
     specialization: pick([["json-ld", ld.specialization]]),
-    address: pick([["json-ld", ld.address]]),
+    address: pick([
+      ["json-ld", ld.address],
+      ["address block", addressElement()],
+      ["page text", locationFromText(fullText)],
+    ]),
+    tags: pick([["page copy", tagsFromText(fullText).join(", ")]]),
     // og:image ranks below the page scan on purpose: it's frequently a logo
     // or a social share card, whereas the scan rejects logo-ish images and
     // insists on portrait-ish dimensions before offering anything.
@@ -424,6 +542,7 @@
     website: chosen.website.value,
     specialization: chosen.specialization.value,
     address: chosen.address.value,
+    tags: chosen.tags.value,
     photoUrl: chosen.photoUrl.value,
   };
 
@@ -436,6 +555,7 @@
     website: chosen.website.source,
     specialization: chosen.specialization.source,
     address: chosen.address.source,
+    tags: chosen.tags.source,
     photoUrl: chosen.photoUrl.source,
   };
 

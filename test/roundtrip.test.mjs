@@ -63,9 +63,9 @@ describe("Practice Studio reads what the clipper writes", { skip: !available && 
     assert.doesNotMatch(parsed.notes, /Specialization:/);
   });
 
-  test("the address reaches the notes field, and nothing else does", () => {
+  test("the location reaches the notes field, and nothing else does", () => {
     const notes = parseVCard(card()).notes;
-    assert.equal(notes, "Address: 9 Larkspur Ave, Ashford, VT");
+    assert.equal(notes, "Location: 9 Larkspur Ave, Ashford, VT");
   });
 
   test("long folded values unfold back to the original text", () => {

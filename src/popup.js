@@ -25,7 +25,8 @@ const FIELDS = [
   ["email", "Email"],
   ["website", "Website"],
   ["specialization", "Specialization"],
-  ["address", "Address"],
+  ["tags", "Tags"],
+  ["address", "Location"],
 ];
 
 const form = document.getElementById("form");

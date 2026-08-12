@@ -57,8 +57,8 @@ describe("buildVCard", () => {
     assert.ok(!unfold(card).includes("Specialization: "));
   });
 
-  test("keeps the address in NOTE, which is the only place it can survive", () => {
-    assert.ok(unfold(build()).includes("Address: 18 Fern Street\\, Suite 4\\, Ashford\\, VT"));
+  test("keeps the location in NOTE, which is the only place it can survive", () => {
+    assert.ok(unfold(build()).includes("Location: 18 Fern Street\\, Suite 4\\, Ashford\\, VT"));
   });
 
   test("records nothing about where the card came from", () => {
@@ -87,6 +87,33 @@ describe("buildVCard", () => {
 
   test("refuses a card with no name", () => {
     assert.throws(() => build({ fullName: "", credentials: "" }), /needs a name/);
+  });
+});
+
+describe("tags and location", () => {
+  test("writes tags as CATEGORIES", () => {
+    assert.ok(build({ tags: "EMDR, Trauma, Couples" }).includes("CATEGORIES:EMDR,Trauma,Couples"));
+  });
+
+  test("treats every comma in the Tags field as a separator", () => {
+    // The popup's Tags field is comma-separated, so a comma there always
+    // means "next tag" — there's no way to type one into a tag, and none of
+    // the vocabulary contains one.
+    assert.ok(build({ tags: "Children, teens, EMDR" }).includes("CATEGORIES:Children,teens,EMDR"));
+  });
+
+  test("escapes a semicolon in a tag, which would otherwise read as structure", () => {
+    assert.ok(build({ tags: "Grief; loss" }).includes("CATEGORIES:Grief\\; loss"));
+  });
+
+  test("drops empty entries and writes nothing when there are no tags", () => {
+    assert.ok(build({ tags: "EMDR, , Trauma" }).includes("CATEGORIES:EMDR,Trauma"));
+    assert.ok(!build({ tags: "" }).includes("CATEGORIES"));
+    assert.ok(!build({ tags: " , " }).includes("CATEGORIES"));
+  });
+
+  test("puts the location in NOTE, where it has nowhere else to go", () => {
+    assert.ok(unfold(build()).includes("Location: 18 Fern Street"));
   });
 });
 

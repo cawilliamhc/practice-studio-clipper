@@ -65,9 +65,9 @@ export function displayName(fields) {
 function noteLines(fields) {
   const lines = [];
   const address = (fields.address || "").trim();
-  // Address has no field of its own on a Contact, so unlike specialization it
-  // genuinely needs the note to survive at all.
-  if (address) lines.push(`Address: ${address}`);
+  // Location has no field of its own on a Contact, so unlike specialization
+  // and tags it genuinely needs the note to survive at all.
+  if (address) lines.push(`Location: ${address}`);
   return lines;
 }
 
@@ -107,6 +107,16 @@ export function buildVCard(fields, { uid, photoFileName = "" } = {}) {
 
   const notes = noteLines(fields);
   if (notes.length) lines.push(`NOTE:${escapeText(notes.join("\n"))}`);
+
+  // CATEGORIES is the standard vCard property for tags, so a card exported
+  // from anywhere else carries them here too. Each value is escaped
+  // individually and joined with plain commas — the commas are the
+  // separator, so escaping them away would collapse the list into one tag.
+  const tags = String(fields.tags || "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  if (tags.length > 0) lines.push(`CATEGORIES:${tags.map(escapeText).join(",")}`);
 
   // Every card this extension writes is a mental health provider.
   lines.push("X-CONTACT-TYPE:therapist");

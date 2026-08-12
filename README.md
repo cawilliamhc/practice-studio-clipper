@@ -79,6 +79,29 @@ the image can't be saved, the contact still is; the status line says so.
 A photo fills only where blank on import. Re-clipping never replaces a headshot you already
 have.
 
+## Tags and location
+
+**Tags** come from a closed vocabulary of about fifty terms — modalities (EMDR, IFS, DBT,
+Brainspotting), who someone sees (Couples, Adolescents, Perinatal), what they work with
+(Trauma, ADHD, Grief), and how they work (Telehealth, Sliding Scale, Walk-and-Talk) — matched
+literally against the page copy and capped at ten. No model is involved, so there is nothing
+to hallucinate: if the words aren't on the page, the tag isn't applied.
+
+Closed on purpose. Every tag becomes a **contact group** in Practice Studio, created on
+import if it doesn't exist, and free-form phrases would breed a hundred one-off groups.
+Terms whose mere mention is ambiguous are left out — "I don't accept insurance" reads the
+same as the opposite to a plain match.
+
+They travel as `CATEGORIES`, the standard vCard property for tags, so a card exported from
+anywhere else brings its tags along too.
+
+**Location** is tried in three tiers: a JSON-LD `PostalAddress`, an `<address>` block, then
+the first "City, ST" or "City, State" in the copy. A Contact has no location field, so it
+lands in `NOTE` — the one thing still written there.
+
+Both are matched against the *whole* page, not the 5,000-character slice the model sees: a
+phone number or a city in the footer is still a phone number or a city.
+
 ## The local model
 
 Tick **Fill gaps with the local model** and anything the tiers left blank goes to LM Studio
@@ -142,7 +165,8 @@ the browser.
 | Email | `EMAIL;TYPE=INTERNET` | `email` |
 | Website | `URL` | `website` |
 | Specialization | `X-SPECIALIZATION` | `specialization` |
-| Address | `NOTE` | `notes` — a Contact has no address field, so the note is the only place it survives |
+| Tags | `CATEGORIES` | `tags` → contact groups, created on import if new |
+| Location | `NOTE` | `notes` — a Contact has no location field, so the note is the only place it survives |
 | Headshot | `PHOTO;VALUE=uri` — a bare sibling filename | `photoFileName`, copied into the contacts folder on import |
 | — | `X-CONTACT-TYPE:therapist` | set by the import dialog's dropdown, which already defaults to therapist |
 
@@ -209,6 +233,9 @@ extension.
   letters appear nowhere on the page. That's the trade-off working as designed — credentials
   ride in the contact's display name, so a wrong one is worse than a blank — but it does mean
   typing the odd credential in by hand.
+- Tag matching can catch a practice's *name* rather than a described service — a page for
+  "Northgate Family Therapy" picks up `Families` whether or not they see families. Visible
+  and editable in the popup.
 - Group-practice pages listing several therapists yield only the first one. One page, one
   card, for now. This is also where headshot picking is least reliable — a team page full of
   portraits gives the scorer little to separate them beyond alt text.

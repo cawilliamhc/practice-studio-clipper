@@ -6,6 +6,13 @@
 // document context, which a MV3 service worker doesn't have.
 import { buildVCard, displayName, vcardFileName } from "./vcard.js";
 import { normalizeWithLocalModel } from "./llm.js";
+import {
+  describePriorClip,
+  findPriorClip,
+  loadClipHistory,
+  recordClip,
+  saveClipHistory,
+} from "./history.js";
 
 const INBOX_SUBFOLDER = "ps-contact-inbox";
 const USE_MODEL_KEY = "useLocalModel";
@@ -26,8 +33,10 @@ const saveButton = document.getElementById("save");
 const status = document.getElementById("status");
 const pageUrl = document.getElementById("page-url");
 const useModel = document.getElementById("use-model");
+const prior = document.getElementById("prior");
 
 let scraped = null;
+let clipHistory = [];
 
 function setStatus(message, kind = "") {
   status.textContent = message;
@@ -58,7 +67,12 @@ function render(fields, sources) {
     input.id = `f-${key}`;
     input.name = key;
     input.value = fields[key] || "";
-    input.addEventListener("input", refreshSaveState);
+    input.addEventListener("input", () => {
+      refreshSaveState();
+      // Correcting the name can reveal a prior clip of the same person under
+      // a different URL, so the notice is re-checked as it's typed.
+      if (key === "fullName") refreshPriorNotice();
+    });
 
     wrapper.append(row, input);
     form.append(wrapper);
@@ -73,6 +87,16 @@ function currentFields() {
 
 function refreshSaveState() {
   saveButton.disabled = !currentFields().fullName;
+}
+
+/** Shows whether this page — or this person — has been clipped before. Purely
+ *  informational: re-clipping updates rather than duplicates on import. */
+function refreshPriorNotice() {
+  const message = describePriorClip(
+    findPriorClip(clipHistory, { url: scraped?.sourceUrl, name: currentFields().fullName })
+  );
+  prior.textContent = message ?? "";
+  prior.hidden = !message;
 }
 
 async function scrapeActiveTab() {
@@ -108,6 +132,13 @@ async function save() {
       conflictAction: "uniquify",
       saveAs: false,
     });
+    clipHistory = recordClip(clipHistory, {
+      url: scraped.sourceUrl,
+      name: fields.fullName,
+      savedAt: new Date().toISOString(),
+    });
+    await saveClipHistory(clipHistory);
+    refreshPriorNotice();
     setStatus(`Saved ${displayName(fields)} to ${INBOX_SUBFOLDER}/`, "ok");
   } catch (err) {
     setStatus(err?.message || "Couldn't save that card.", "err");
@@ -150,6 +181,8 @@ async function runLocalModel() {
   for (const key of filledKeys) sources[key] = "local model";
   render(fields, sources);
   refreshSaveState();
+  // The model can supply the name itself, which may match an earlier clip.
+  refreshPriorNotice();
 
   const dropped = result.rejected.length > 0 ? `, ${result.rejected.length} dropped as unverifiable` : "";
   setStatus(`Filled ${filledKeys.join(", ")}${dropped}. Worth a check.`, "ok");
@@ -172,10 +205,12 @@ useModel.addEventListener("change", async () => {
 (async () => {
   try {
     useModel.checked = await loadUseModelPreference();
+    clipHistory = await loadClipHistory();
     scraped = await scrapeActiveTab();
     pageUrl.textContent = scraped.sourceUrl;
     render(scraped.fields, scraped.sources);
     refreshSaveState();
+    refreshPriorNotice();
     if (!scraped.fields.fullName) setStatus("No name found — type one to save.", "err");
     if (useModel.checked) await runLocalModel();
   } catch (err) {

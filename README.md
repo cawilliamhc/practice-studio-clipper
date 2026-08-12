@@ -10,7 +10,7 @@ Every card is filed as a **mental health provider** (`X-CONTACT-TYPE:therapist`)
 - [x] **Step 1** — extension skeleton, deterministic scrape, `.vcf` download
 - [x] **Step 2** — `contactInboxPath` setting + "Import from inbox" in Practice Studio
 - [x] **Step 3** — LM Studio normalizer for what the deterministic tiers miss
-- [ ] **Step 4** — clipped-URL history ("you saved this one on 3 Aug")
+- [x] **Step 4** — clip history ("you clipped this page 3 days ago")
 
 **One-time setup:** in Practice Studio, open **Contacts → settings → Contact inbox folder**,
 choose `~/Downloads/ps-contact-inbox`, and save. "Import from inbox" then appears in the
@@ -86,6 +86,25 @@ stand. A round trip takes about 5 seconds on a 9B model.
 
 The endpoint is fixed at `http://localhost:1234` because it has to match `host_permissions`
 in the manifest, which is what lets the popup reach it.
+
+## Clip history
+
+Opening the popup on a page you've clipped before shows a note saying when. It's
+informational only — re-clipping is harmless, since the inbox uniquifies the filename and
+Practice Studio matches on name and fills only blank fields, so a repeat import updates
+rather than duplicates.
+
+Two ways a repeat is recognized:
+
+- **The page**, compared with scheme, `www.`, trailing slash, fragment, and campaign
+  parameters (`utm_*`, `fbclid`, …) all ignored — the same profile reached from a newsletter
+  and from search is one page, not two
+- **The person**, which catches someone clipped from their own site and later from a
+  directory profile, where the URLs share nothing. Correcting the name in the popup
+  re-checks as you type.
+
+History lives in `chrome.storage.local`, capped at 500 entries, newest first. Nothing leaves
+the browser.
 
 ## Field mapping
 

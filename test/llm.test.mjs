@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import {
   buildRequest,
   comparisonForm,
+  extractJsonObject,
   FILLABLE_FIELDS,
   missingFields,
   pickModel,
@@ -102,6 +103,55 @@ describe("verifyCandidate", () => {
 
   test("survives a reply with no usable object at all", () => {
     assert.deepEqual(verifyCandidate(null, SCRAPED, PAGE), { filled: {}, rejected: [] });
+  });
+});
+
+// A local server runs whatever model is loaded, and the schema is a request
+// rather than a guarantee. These are the shapes a reply actually arrives in.
+describe("extractJsonObject", () => {
+  const expected = { organization: "Northgate Family Therapy" };
+
+  test("parses a bare object, the normal case", () => {
+    assert.deepEqual(extractJsonObject('{"organization":"Northgate Family Therapy"}'), expected);
+  });
+
+  test("survives a reasoning model's think block", () => {
+    const reply = '<think>The page mentions a practice name near the top.</think>\n{"organization":"Northgate Family Therapy"}';
+    assert.deepEqual(extractJsonObject(reply), expected);
+  });
+
+  test("survives a markdown fence", () => {
+    assert.deepEqual(extractJsonObject('```json\n{"organization":"Northgate Family Therapy"}\n```'), expected);
+    assert.deepEqual(extractJsonObject('```\n{"organization":"Northgate Family Therapy"}\n```'), expected);
+  });
+
+  test("survives narration around the object", () => {
+    const reply = 'Sure! Here is what I found:\n{"organization":"Northgate Family Therapy"}\nLet me know if you need more.';
+    assert.deepEqual(extractJsonObject(reply), expected);
+  });
+
+  test("survives a leaked chat-template token", () => {
+    assert.deepEqual(extractJsonObject('<|channel|>{"organization":"Northgate Family Therapy"}'), expected);
+  });
+
+  test("returns null for an empty or missing reply", () => {
+    assert.equal(extractJsonObject(""), null);
+    assert.equal(extractJsonObject("   "), null);
+    assert.equal(extractJsonObject(null), null);
+    assert.equal(extractJsonObject(undefined), null);
+  });
+
+  test("returns null for prose with no object in it", () => {
+    assert.equal(extractJsonObject("I could not find a practice name on this page."), null);
+  });
+
+  test("returns null for an object truncated mid-string", () => {
+    assert.equal(extractJsonObject('{"organization":"Northgate Family Th'), null);
+  });
+
+  test("keeps nested braces intact rather than stopping at the first close", () => {
+    const reply = 'noise {"a":{"b":"c"},"d":"e"} more noise';
+    assert.deepEqual(extractJsonObject(reply), { a: { b: "c" }, d: "e" });
   });
 });
 

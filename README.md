@@ -128,6 +128,11 @@ follow it, the reply is constrained by a JSON schema so there's no free-form cha
 every value is then verified or labelled. The worst an injected instruction achieves is a
 wrong field you see before saving.
 
+If the model wraps its answer in a markdown fence, narrates around it, or emits a `<think>`
+block first, the object is salvaged rather than the clip being lost. When nothing parseable
+comes back the status line quotes what it actually said, and the full reply goes to the
+popup's console (right-click → Inspect).
+
 Requirements: LM Studio running with a chat model loaded. The model is auto-selected from
 `/v1/models` (embedding models skipped), so there's no id to keep in sync. If the server
 isn't running, the clip still works — the status line says so and the deterministic fields

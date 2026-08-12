@@ -50,6 +50,20 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 12px;
+        padding-bottom: 11px;
+        border-bottom: 1px solid var(--border);
+        font-size: 11px;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      /* The generic input rule below sets width:100%, which stretches a
+         checkbox's box across the row and strands its label. */
+      .toggle input { width: auto; flex: none; margin: 0; cursor: pointer; }
       .field { margin-bottom: 9px; }
       .row {
         display: flex;
@@ -103,6 +117,10 @@
   <body>
     <h1>Clip therapist contact</h1>
     <p class="sub" id="page-url">Reading page…</p>
+    <label class="toggle">
+      <input type="checkbox" id="use-model" />
+      <span>Fill gaps with the local model</span>
+    </label>
     <form id="form"></form>
     <button id="save" type="button" disabled>Save to inbox</button>
     <p id="status" role="status"></p>

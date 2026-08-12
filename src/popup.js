@@ -5,8 +5,10 @@
 // opened this popup, and blob/data URL creation for the download needs a
 // document context, which a MV3 service worker doesn't have.
 import { buildVCard, displayName, vcardFileName } from "./vcard.js";
+import { normalizeWithLocalModel } from "./llm.js";
 
 const INBOX_SUBFOLDER = "ps-contact-inbox";
+const USE_MODEL_KEY = "useLocalModel";
 
 const FIELDS = [
   ["fullName", "Full name"],
@@ -23,6 +25,7 @@ const form = document.getElementById("form");
 const saveButton = document.getElementById("save");
 const status = document.getElementById("status");
 const pageUrl = document.getElementById("page-url");
+const useModel = document.getElementById("use-model");
 
 let scraped = null;
 
@@ -114,13 +117,67 @@ async function save() {
 
 saveButton.addEventListener("click", save);
 
+/**
+ * Asks the local model to fill whatever the page didn't yield. Deterministic
+ * values are never revisited — the normalizer only sees blank fields — and
+ * anything it supplies is relabelled so it's obvious which values came from a
+ * model rather than off the page.
+ */
+async function runLocalModel() {
+  const before = currentFields();
+  setStatus("Asking the local model…");
+
+  const result = await normalizeWithLocalModel(before, scraped.pageText);
+
+  if (result.skipped) {
+    setStatus("Nothing left for the model to fill.");
+    return;
+  }
+  if (result.error) {
+    setStatus(result.error, "err");
+    return;
+  }
+
+  const filledKeys = Object.keys(result.filled);
+  if (filledKeys.length === 0) {
+    const note = result.rejected.length > 0 ? " (some answers weren't on the page)" : "";
+    setStatus(`The model found nothing to add${note}.`);
+    return;
+  }
+
+  const fields = { ...before, ...result.filled };
+  const sources = { ...scraped.sources };
+  for (const key of filledKeys) sources[key] = "local model";
+  render(fields, sources);
+  refreshSaveState();
+
+  const dropped = result.rejected.length > 0 ? `, ${result.rejected.length} dropped as unverifiable` : "";
+  setStatus(`Filled ${filledKeys.join(", ")}${dropped}. Worth a check.`, "ok");
+}
+
+async function loadUseModelPreference() {
+  try {
+    const stored = await chrome.storage.local.get(USE_MODEL_KEY);
+    return stored?.[USE_MODEL_KEY] === true;
+  } catch {
+    return false;
+  }
+}
+
+useModel.addEventListener("change", async () => {
+  chrome.storage.local.set({ [USE_MODEL_KEY]: useModel.checked });
+  if (useModel.checked && scraped) await runLocalModel();
+});
+
 (async () => {
   try {
+    useModel.checked = await loadUseModelPreference();
     scraped = await scrapeActiveTab();
     pageUrl.textContent = scraped.sourceUrl;
     render(scraped.fields, scraped.sources);
     refreshSaveState();
     if (!scraped.fields.fullName) setStatus("No name found — type one to save.", "err");
+    if (useModel.checked) await runLocalModel();
   } catch (err) {
     pageUrl.textContent = "";
     setStatus(err?.message || "Something went wrong.", "err");

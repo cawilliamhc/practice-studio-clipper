@@ -9,7 +9,7 @@ Every card is filed as a **mental health provider** (`X-CONTACT-TYPE:therapist`)
 
 - [x] **Step 1** — extension skeleton, deterministic scrape, `.vcf` download
 - [x] **Step 2** — `contactInboxPath` setting + "Import from inbox" in Practice Studio
-- [ ] **Step 3** — LM Studio normalizer for what the deterministic tiers miss
+- [x] **Step 3** — LM Studio normalizer for what the deterministic tiers miss
 - [ ] **Step 4** — clipped-URL history ("you saved this one on 3 Aug")
 
 **One-time setup:** in Practice Studio, open **Contacts → settings → Contact inbox folder**,
@@ -50,13 +50,42 @@ it:
 3. **DOM** — `tel:` and `mailto:` links, `<h1>`
 4. **Page text** — phone numbers only, and only when there's no `tel:` link
 
-Phone and email are never inferred from prose beyond that last conservative step. When the
-LLM normalizer arrives in step 3 it will only ever read fields the tiers left blank, and
-contact details it returns get checked against the raw page text before they're accepted —
-a hallucinated phone number in a referral directory is the failure mode worth designing
-against.
+Phone and email are never inferred from prose beyond that last conservative step. Platform
+noise (`@wixpress.com`, `@squarespace.com`) is filtered out of email candidates.
 
-Platform noise (`@wixpress.com`, `@squarespace.com`) is filtered out of email candidates.
+## The local model
+
+Tick **Fill gaps with the local model** and anything the tiers left blank goes to LM Studio
+on `localhost:1234`. The preference sticks between clips. Nothing leaves the machine.
+
+Three rules make this safe to point at an arbitrary website:
+
+1. **Only blank fields.** A value that came from JSON-LD or a `tel:` link is never
+   reconsidered.
+2. **Never asked for phone, email, website, or address.** Those are where a plausible
+   invention does real damage — a wrong number in a referral directory gets dialled — and
+   the deterministic tiers already cover them. The measured gap was organization and
+   specialization, so that's what this closes.
+3. **Names, credentials, and organizations must appear on the page**, compared with case,
+   punctuation, and spacing ignored. If the model can't point at it, it's dropped and the
+   status line says how many went.
+
+Specialization is exempt from rule 3 by necessity — it's a summary of modalities scattered
+across a page, not a quotable span — so it's length-capped instead. Every filled field is
+labelled `from local model` in the popup, so it's obvious which values want a second look.
+
+The page text is untrusted input: it's passed as data with an explicit instruction not to
+follow it, the reply is constrained by a JSON schema so there's no free-form channel, and
+every value is then verified or labelled. The worst an injected instruction achieves is a
+wrong field you see before saving.
+
+Requirements: LM Studio running with a chat model loaded. The model is auto-selected from
+`/v1/models` (embedding models skipped), so there's no id to keep in sync. If the server
+isn't running, the clip still works — the status line says so and the deterministic fields
+stand. A round trip takes about 5 seconds on a 9B model.
+
+The endpoint is fixed at `http://localhost:1234` because it has to match `host_permissions`
+in the manifest, which is what lets the popup reach it.
 
 ## Field mapping
 
@@ -119,10 +148,21 @@ Then from the page console:
 const r = eval(await (await fetch('/src/scrape.js')).text()); console.table(r.fields);
 ```
 
+`test/fixtures/popup-harness.html` runs the **real popup** outside the extension — shipping
+`popup.js`, `vcard.js`, and `llm.js`, with only the `chrome.*` APIs faked and the scrape
+result canned. It does a live local-model round trip and logs the vCard it would have
+written, which is the quickest way to see a change to the popup without reloading the
+extension.
+
 ## Known rough edges
 
 - `jobTitle` gets folded into specialization, so a card can read "…, Clinical Social Worker"
-  alongside an LCSW credential. Harmless, editable, and step 3's job to tidy.
+  alongside an LCSW credential. Harmless and editable.
+- Rule 3 is stricter than it is clever. On a page reading "I'm a licensed mental health
+  counselor," the model correctly answered `LMHC` and the guardrail dropped it, because the
+  letters appear nowhere on the page. That's the trade-off working as designed — credentials
+  ride in the contact's display name, so a wrong one is worse than a blank — but it does mean
+  typing the odd credential in by hand.
 - Group-practice pages listing several therapists yield only the first one. One page, one
   card, for now.
 - The inbox folder is fixed at `Downloads/ps-contact-inbox` (`INBOX_SUBFOLDER` in

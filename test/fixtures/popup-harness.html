@@ -1,0 +1,95 @@
+<!doctype html>
+<!-- Runs the real popup outside the extension, so its markup, rendering, and
+     the live local-model round trip can be seen in a browser.
+
+         python3 -m http.server 8765 --directory .
+         open http://localhost:8765/test/fixtures/popup-harness.html
+
+     Only the chrome.* APIs are faked: the scrape result is canned (scrape.js
+     is verified against the fixtures directly) and the download is logged
+     instead of written. Everything else — popup.js, vcard.js, llm.js — is the
+     code that ships. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Popup harness</title>
+    <style>
+      body { margin: 0; background: #52525b; }
+      #frame { width: 360px; margin: 24px auto; background: var(--bg, #fff); box-shadow: 0 8px 30px rgba(0,0,0,.3); }
+      #log { max-width: 620px; margin: 0 auto 24px; color: #e4e4e7; font: 12px ui-monospace, monospace; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <div id="frame"></div>
+    <pre id="log"></pre>
+    <script type="module">
+      const log = (...parts) => {
+        document.getElementById("log").textContent += parts.join(" ") + "\n";
+      };
+
+      // The page prose.html yields, as recorded from a real scrape.js run.
+      const pageHtml = await (await fetch("/test/fixtures/prose.html")).text();
+      const holder = document.createElement("div");
+      holder.innerHTML = pageHtml.replace(/<!doctype html>/i, "");
+      document.body.append(holder);
+      const pageText = holder.innerText.replace(/\s+/g, " ").trim();
+      holder.remove();
+
+      const SCRAPE_RESULT = {
+        fields: {
+          fullName: "Colin Whitaker",
+          credentials: "",
+          organization: "",
+          phone: "+15550106612",
+          email: "",
+          website: "https://example.test/colin",
+          specialization: "",
+          address: "",
+        },
+        sources: {
+          fullName: "page heading",
+          credentials: "",
+          organization: "",
+          phone: "tel: link",
+          email: "",
+          website: "address bar",
+          specialization: "",
+          address: "",
+        },
+        sourceUrl: "https://example.test/colin",
+        scrapedAt: new Date().toISOString(),
+        pageText,
+      };
+
+      let stored = { useLocalModel: true };
+      globalThis.chrome = {
+        storage: {
+          local: {
+            get: async (key) => ({ [key]: stored[key] }),
+            set: async (patch) => {
+              Object.assign(stored, patch);
+              log("storage.set", JSON.stringify(patch));
+            },
+          },
+        },
+        tabs: { query: async () => [{ id: 1, url: "https://example.test/colin" }] },
+        scripting: { executeScript: async () => [{ result: SCRAPE_RESULT }] },
+        downloads: {
+          download: async (opts) => {
+            log("downloads.download", opts.filename);
+            log(decodeURIComponent(opts.url.split(",")[1]));
+            return 1;
+          },
+        },
+      };
+
+      // Mount the shipping popup markup, then let the shipping script drive it.
+      const popupHtml = await (await fetch("/src/popup.html")).text();
+      const parsed = new DOMParser().parseFromString(popupHtml, "text/html");
+      document.head.append(...parsed.head.querySelectorAll("style"));
+      document.getElementById("frame").innerHTML = parsed.body.innerHTML;
+      document.querySelector("#frame script")?.remove();
+      await import("/src/popup.js");
+    </script>
+  </body>
+</html>

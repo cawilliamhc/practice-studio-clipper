@@ -41,6 +41,72 @@
     return { name: parts[0], credentials: creds.join(", ") };
   }
 
+  // Words no personal name contains. Their presence marks a string as a
+  // headline, tagline, or practice name — "Affirmative psychotherapy with
+  // Kay Teresa Hall" is a page banner, not a person.
+  const NOT_IN_A_NAME = new Set([
+    "with", "and", "for", "the", "of", "in", "at", "on", "your", "my", "our", "a", "an", "to",
+    "by", "from", "is", "are", "am", "welcome", "home", "about", "meet",
+    "psychotherapy", "therapy", "therapist", "counseling", "counselling", "counselor",
+    "counsellor", "services", "service", "practice", "clinic", "center", "centre", "group",
+    "associates", "partners", "wellness", "health", "healing", "support", "llc", "pllc", "inc", "pc",
+  ]);
+
+  // Lowercase particles that legitimately sit inside a personal name.
+  const NAME_PARTICLES = new Set([
+    "van", "von", "de", "del", "della", "da", "di", "la", "le", "du", "den", "der", "bin", "al", "ben", "st",
+  ]);
+
+  /** Strips leading punctuation and trailing non-name characters — real pages
+   *  produce things like "%Affirmative …" from stray markup. */
+  function trimNameJunk(raw) {
+    return clean(raw).replace(/^[^\p{L}]+/u, "").replace(/[^\p{L}.]+$/u, "");
+  }
+
+  /**
+   * True when a string reads like a person's name rather than a headline.
+   *
+   * Deliberately strict, because the cost is asymmetric: a rejected name
+   * leaves the field blank, which the local model may fill and which the
+   * popup shows as "not found" — whereas an accepted headline becomes a
+   * contact literally named "Affirmative psychotherapy with Kay Teresa Hall",
+   * which no name matcher will ever connect to the real person.
+   */
+  function looksLikePersonName(raw) {
+    const value = clean(raw);
+    if (!value || value.length > 60) return false;
+    if (/[\d%|+:/@!?]/.test(value)) return false;
+    const words = value.split(/\s+/).filter(Boolean);
+    if (words.length < 2 || words.length > 5) return false;
+    for (const word of words) {
+      const bare = word.replace(/[.,'’\-]/g, "").toLowerCase();
+      if (!bare) continue;
+      if (NOT_IN_A_NAME.has(bare)) return false;
+      if (!/^\p{Lu}/u.test(word) && !NAME_PARTICLES.has(bare)) return false;
+    }
+    return true;
+  }
+
+  /** Pulls a person out of a headline that ends with one — "…psychotherapy
+   *  with Kay Teresa Hall" gives up "Kay Teresa Hall". */
+  function personNameWithin(raw) {
+    const match = clean(raw).match(
+      // Both cases spelled out rather than an /i flag: that would also relax
+      // \p{Lu} and let a lowercase word pass as a name.
+      /\b(?:[Ww]ith|[Bb]y|[Mm]eet|[Ff]eaturing)\s+(\p{Lu}[\p{L}'’.-]*(?:\s+\p{Lu}[\p{L}'’.-]*){1,3})\s*$/u
+    );
+    return match ? match[1] : "";
+  }
+
+  /** A heuristic name candidate, kept only if it reads like a person — or if
+   *  a person's name can be lifted out of it. */
+  function personish(raw) {
+    const cleaned = trimNameJunk(raw);
+    if (looksLikePersonName(cleaned)) return cleaned;
+    const within = personNameWithin(cleaned);
+    return looksLikePersonName(within) ? within : "";
+  }
+
   /** Drops a trailing tagline from a title-ish string: a page <title> is very
    *  often "Rowan Aldridge, LCSW | Trauma Therapy in Austin". */
   function stripTagline(raw) {
@@ -182,7 +248,12 @@
       .filter((chunk) => !GENERIC_TITLE.test(chunk))
       .filter((chunk) => {
         const key = compareKey(chunk);
-        return key && key !== nameKey && !key.startsWith(nameKey);
+        if (!key) return false;
+        // No name to compare against — every chunk is a candidate. Without
+        // this guard an empty nameKey makes startsWith("") true for all of
+        // them, so a rejected name would silently cost the organization too.
+        if (!nameKey) return true;
+        return key !== nameKey && !key.startsWith(nameKey);
       });
     return candidates.sort((a, b) => b.length - a.length)[0] || "";
   }
@@ -313,10 +384,12 @@
   // The name is resolved first: credentials are split off whichever string
   // became the name, and the org candidate from <title> needs the name to
   // know what to discard.
+  // Structured data is taken at its word; the heuristic tiers have to prove
+  // they found a person rather than a headline.
   const namePick = pick([
-    ["json-ld", ld.fullName],
-    ["page heading", dom.fullName],
-    ["page title", mt.fullName],
+    ["json-ld", trimNameJunk(ld.fullName)],
+    ["page heading", personish(dom.fullName)],
+    ["page title", personish(mt.fullName)],
   ]);
   const split = splitCredentials(namePick.value);
 

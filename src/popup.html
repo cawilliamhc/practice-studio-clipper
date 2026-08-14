@@ -92,6 +92,16 @@
         background: var(--field-bg);
       }
       .photo-meta { min-width: 0; }
+      /* The alternatives strip. Hidden until there is more than one candidate,
+         so a solo practitioner's page looks exactly as it did before. */
+      .shots { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+      .shots button {
+        width: 44px; height: 44px; padding: 0; flex: none;
+        border: 2px solid transparent; border-radius: 6px; overflow: hidden;
+        background: var(--field-bg); cursor: pointer;
+      }
+      .shots button img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .shots button[aria-pressed="true"] { border-color: var(--accent, #186); }
       .link {
         display: block;
         width: auto;
@@ -170,6 +180,8 @@
         <button type="button" class="link" id="photo-clear">Don't include</button>
       </div>
     </div>
+    <div class="shots" id="shots" hidden></div>
+    <button type="button" class="link" id="shots-more" hidden>Show every image on the page</button>
     <form id="form"></form>
     <button id="save" type="button" disabled>Save to inbox</button>
     <p id="status" role="status"></p>

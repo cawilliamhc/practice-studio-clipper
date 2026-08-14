@@ -359,21 +359,24 @@
    * visible in the popup, which beats attaching a stranger's face to a
    * colleague's record.
    */
-  function findHeadshot(personName) {
+  function rankHeadshots(personName) {
     const nameTokens = wordsOf(personName).split(" ").filter((t) => t.length > 2);
-    let best = null;
+    const all = [...document.images];
+    const likely = [];
+    const rest = [];
+    const seen = new Set();
 
-    for (const img of document.images) {
+    all.forEach((img, position) => {
       const src = absoluteUrl(img.currentSrc || img.src);
-      if (!src) continue;
+      if (!src || seen.has(src)) return; // the same face twice is one candidate
+      seen.add(src);
       const { width, height } = imageDimensions(img);
-      if (width < 80 || height < 80) continue; // spacers, icons, tracking pixels
+      if (width < 40 || height < 40) return; // tracking pixels and spacers, always
 
       const describedBy = `${img.alt || ""} ${img.className || ""} ${img.id || ""} ${src}`;
-      if (NOT_A_PERSON.test(describedBy)) continue;
-
-      const ratio = width / height;
-      if (ratio < 0.5 || ratio > 1.9) continue; // banners and slivers aren't headshots
+      const ratio = height > 0 ? width / height : 0;
+      const furniture = NOT_A_PERSON.test(describedBy);
+      const portraitish = width >= 80 && height >= 80 && ratio >= 0.5 && ratio <= 1.9;
 
       let score = 0;
       const described = wordsOf(describedBy);
@@ -382,13 +385,27 @@
       if (ratio >= 0.7 && ratio <= 1.3) score += 2; // square-ish
       if (width >= 200 && height >= 200) score += 1;
       // Earlier in the document is likelier to be the subject of the page.
-      const position = [...document.images].indexOf(img);
       if (position <= 2) score += 1;
 
-      if (score > 0 && (!best || score > best.score)) best = { src, score };
-    }
+      const candidate = { src, score, width, height, alt: clean(img.alt).slice(0, 80) };
+      // The old rule exactly: furniture and odd shapes never get offered as
+      // THE answer. They stay available in `rest` because the scan is wrong
+      // often enough on a group practice page — and a headshot the filter
+      // rejected for a wide crop is still the right face.
+      if (!furniture && portraitish && score > 0) likely.push(candidate);
+      else rest.push(candidate);
+    });
 
-    return best ? best.src : "";
+    likely.sort((a, b) => b.score - a.score);
+    // Bigger first among the leftovers: a rejected headshot outranks an icon.
+    rest.sort((a, b) => b.width * b.height - a.width * a.height);
+    return { likely, rest };
+  }
+
+  /** The single best guess — unchanged behaviour for every other caller. */
+  function findHeadshot(personName) {
+    const { likely } = rankHeadshots(personName);
+    return likely.length > 0 ? likely[0].src : "";
   }
 
   // ---- tags ---------------------------------------------------------------
@@ -546,6 +563,12 @@
     photoUrl: chosen.photoUrl.value,
   };
 
+  // Every plausible image, so the popup can offer alternatives when the
+  // top pick is another therapist on a group practice page. Computed once
+  // here rather than re-scanning: document.images is live, and the popup
+  // has no access to the page after this returns.
+  const ranked = rankHeadshots(split.name);
+
   const sources = {
     fullName: chosen.fullName.source,
     credentials: split.credentials ? chosen.fullName.source : "",
@@ -562,6 +585,11 @@
   return {
     fields,
     sources,
+    // Ranked alternatives for the photo. `likely` are images that pass the
+    // same bar findHeadshot uses; `rest` is everything else on the page,
+    // offered only behind a toggle — the right face is sometimes one the
+    // filter threw out for being a wide crop.
+    photoCandidates: ranked,
     sourceUrl: canonical || location.href,
     scrapedAt: new Date().toISOString(),
     // Carried for the LLM normalizer step, which reads only what the

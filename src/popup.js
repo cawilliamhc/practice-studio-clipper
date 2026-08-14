@@ -39,6 +39,8 @@ const photoBlock = document.getElementById("photo");
 const photoImg = document.getElementById("photo-img");
 const photoSrc = document.getElementById("photo-src");
 const photoClear = document.getElementById("photo-clear");
+const shotsStrip = document.getElementById("shots");
+const shotsMore = document.getElementById("shots-more");
 
 let scraped = null;
 let clipHistory = [];
@@ -115,7 +117,63 @@ function showPhoto(url, source) {
   photoBlock.hidden = false;
 }
 
-photoClear.addEventListener("click", () => showPhoto(null));
+photoClear.addEventListener("click", () => {
+  showPhoto(null);
+  markChosenShot();
+});
+
+// ---- alternative headshots -------------------------------------------------
+//
+// The scorer picks well on a solo practitioner's page and badly on a group
+// practice, where another therapist's face can legitimately outrank the
+// subject's. No amount of tuning fixes that from inside the page, so the
+// alternatives are simply offered: the top pick stays selected, and when it
+// is wrong the right face is one click away.
+//
+// `rest` — everything the filter rejected as furniture or the wrong shape —
+// hides behind a toggle, because the right photo is occasionally one the
+// scan threw out for being a wide crop.
+let shotCandidates = { likely: [], rest: [] };
+let showingAllShots = false;
+
+function markChosenShot() {
+  for (const button of shotsStrip.querySelectorAll("button")) {
+    button.setAttribute("aria-pressed", String(button.dataset.src === photoUrl));
+  }
+}
+
+function renderShots() {
+  const shown = showingAllShots ? [...shotCandidates.likely, ...shotCandidates.rest] : shotCandidates.likely;
+  shotsStrip.replaceChildren();
+  for (const shot of shown) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.src = shot.src;
+    button.title = `${shot.alt || "image"} — ${shot.width}×${shot.height}`;
+    const img = document.createElement("img");
+    img.src = shot.src;
+    img.alt = shot.alt || "Candidate image";
+    // A thumbnail that won't load is a candidate that can't be chosen.
+    img.onerror = () => button.remove();
+    button.append(img);
+    button.addEventListener("click", () => {
+      showPhoto(shot.src, "you picked it");
+      markChosenShot();
+    });
+    shotsStrip.append(button);
+  }
+  // One candidate and nothing hidden behind the toggle is just the photo
+  // already shown above — a strip of one helps nobody.
+  const worthShowing = shown.length > 1 || (shown.length === 1 && shown[0].src !== photoUrl);
+  shotsStrip.hidden = !worthShowing;
+  shotsMore.hidden = showingAllShots || shotCandidates.rest.length === 0;
+  markChosenShot();
+}
+
+shotsMore.addEventListener("click", () => {
+  showingAllShots = true;
+  renderShots();
+});
 
 /**
  * Saves the headshot beside the card and reports the name it actually landed
@@ -276,6 +334,9 @@ useModel.addEventListener("change", async () => {
     pageUrl.textContent = scraped.sourceUrl;
     render(scraped.fields, scraped.sources);
     showPhoto(scraped.fields.photoUrl, scraped.sources.photoUrl);
+    shotCandidates = scraped.photoCandidates ?? { likely: [], rest: [] };
+    showingAllShots = false;
+    renderShots();
     refreshSaveState();
     refreshPriorNotice();
     if (!scraped.fields.fullName) setStatus("No name found — type one to save.", "err");

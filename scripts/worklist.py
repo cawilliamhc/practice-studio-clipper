@@ -53,30 +53,47 @@ parts = [f"""<title>Contact photo worklist</title>
  body{{font:14px -apple-system,system-ui,sans-serif;margin:2rem auto;max-width:62rem;color:#222}}
  h1{{font-size:1.3rem;margin-bottom:.2rem}} .sub{{color:#666;margin-bottom:1.2rem}}
  li{{margin:.3rem 0;padding:.4rem .6rem;border-radius:6px;display:flex;gap:.7rem;align-items:baseline}}
- li.done{{opacity:.4;text-decoration:line-through}} li:nth-child(odd){{background:#f6f6f4}}
+ li:nth-child(odd){{background:#f6f6f4}}
+ li.seen{{background:#fdf6e6;box-shadow:inset 3px 0 #d9a441}}
+ li.done{{opacity:.4;text-decoration:line-through;background:none;box-shadow:none}}
  a{{font-weight:600;color:#186}} .dom{{color:#888;font-size:12px}} .miss{{color:#a60;font-size:12px}}
+ .flag{{display:none;color:#96702a;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}}
+ li.seen:not(.done) .flag{{display:inline}}
  input{{transform:scale(1.2)}} #bar{{position:sticky;top:0;background:#fff;padding:.6rem 0;border-bottom:1px solid #ddd}}
+ #o{{color:#96702a;font-weight:600}}
 </style>
 <h1>Contact photo worklist</h1>
 <div class=sub>{len(rows)} contacts with a website and no photo. Client-linked and emergency contacts excluded.
-Open a link, clip it, tick it off — progress saves in this browser. Rerun
-<code>scripts/worklist.py</code> to drop the ones already done.</div>
-<div id=bar><b><span id=n>0</span> / {len(rows)}</b> &nbsp;
-<button onclick="localStorage.removeItem('psWorklist');location.reload()">reset</button></div>
+Open a link — the row marks itself <b>opened</b> so you can see where you stopped — clip it, then tick it off.
+Progress saves in this browser. Rerun <code>scripts/worklist.py</code> to drop the ones already done.</div>
+<div id=bar><b><span id=n>0</span> / {len(rows)}</b> <span id=o></span> &nbsp;
+<button onclick="localStorage.removeItem('psWorklist');localStorage.removeItem('psWorklistOpened');location.reload()">reset</button></div>
 <ol>"""]
 for name, u, dom, org, missing in rows:
     extra = f' <span class=miss>also missing: {", ".join(missing)}</span>' if missing else ""
     o = f' <span class=dom>· {html.escape(org)}</span>' if org else ""
     parts.append(f'<li data-k="{html.escape(name)}"><input type=checkbox>'
                  f'<span><a href="{html.escape(u)}" target=_blank rel=noopener>{html.escape(name)}</a>'
-                 f'{o} <span class=dom>{html.escape(dom)}</span>{extra}</span></li>')
+                 f'{o} <span class=dom>{html.escape(dom)}</span>{extra}'
+                 f' <span class=flag>opened</span></span></li>')
 parts.append("""</ol>
 <script>
+// Two states, deliberately separate: opening a link says you looked, ticking
+// says you clipped it. Only the tick counts as done — a page with no usable
+// headshot still gets opened, and should stay visibly unfinished.
 const done=new Set(JSON.parse(localStorage.getItem('psWorklist')||'[]'));
-const sync=()=>{document.getElementById('n').textContent=done.size;
-  localStorage.setItem('psWorklist',JSON.stringify([...done]))};
+const seen=new Set(JSON.parse(localStorage.getItem('psWorklistOpened')||'[]'));
+const sync=()=>{
+  document.getElementById('n').textContent=done.size;
+  const open=[...seen].filter(k=>!done.has(k)).length;
+  document.getElementById('o').textContent=open?`· ${open} opened, not ticked`:'';
+  localStorage.setItem('psWorklist',JSON.stringify([...done]));
+  localStorage.setItem('psWorklistOpened',JSON.stringify([...seen]));
+};
 document.querySelectorAll('li').forEach(li=>{const k=li.dataset.k,cb=li.querySelector('input');
+  if(seen.has(k))li.classList.add('seen');
   if(done.has(k)){cb.checked=true;li.classList.add('done')}
+  li.querySelector('a').addEventListener('click',()=>{seen.add(k);li.classList.add('seen');sync()});
   cb.onchange=()=>{cb.checked?(done.add(k),li.classList.add('done')):(done.delete(k),li.classList.remove('done'));sync()}});
 sync();
 </script>""")

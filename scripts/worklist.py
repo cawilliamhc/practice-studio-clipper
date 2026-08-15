@@ -8,8 +8,8 @@ looking up a client's family member online is not what this is for.
 
 The one criterion is a missing photo. Contacts with a website on file link
 straight to it; the rest get a search link, which is slower but is the same
-move by hand. Names that read as an organisation rather than a person are
-dropped — a practice has a logo, not a headshot.
+move by hand. Organisations are listed alongside people — a practice logo is
+a real answer for a card that has nothing.
 
     python3 scripts/worklist.py [output.html]
 """
@@ -32,14 +32,7 @@ def prop(text, name):
     m = re.search(rf"^{name}(?:;[^:\r\n]*)?:(.*)$", text, re.M)
     return m.group(1).strip() if m else ""
 
-# A practice or clinic has a logo, not a headshot, so those cards are not work
-# this list can close out. Four or more words is the other tell.
-ORGWORD = re.compile(
-    r"\b(inc|llc|pllc|ltd|cent(er|re)s?|associates?|association|group|institute|clinics?|"
-    r"services|solutions|partners|counseling|therapy|psychological|psychiatry|health|"
-    r"wellness|foundation|society|network|academy|school|university|hospital|company)\b", re.I)
-
-rows, skipped_orgs = [], 0
+rows = []
 for path in sorted(glob.glob(os.path.join(CONTACTS, "**", "*.vcf"), recursive=True)):
     t = unfold(open(path, encoding="utf-8", errors="replace").read())
     if "PHOTO" in t:
@@ -47,9 +40,6 @@ for path in sorted(glob.glob(os.path.join(CONTACTS, "**", "*.vcf"), recursive=Tr
     if re.search(r"^X-(OWNER-CLIENT-FOLDER|LINKED-CLIENT)", t, re.M):
         continue
     name = prop(t, "FN") or os.path.basename(path)[:-4]
-    if ORGWORD.search(name) or len(name.split()) > 4:
-        skipped_orgs += 1
-        continue
     org = prop(t, "ORG").replace("\\,", ",").rstrip(";")
     u = prop(t, "URL").replace("\\:", ":").replace("\\,", ",")
     if u and not u.startswith("fb://"):
@@ -85,8 +75,8 @@ parts = [f"""<title>Contact photo worklist</title>
  #o{{color:#96702a;font-weight:600}}
 </style>
 <h1>Contact photo worklist</h1>
-<div class=sub>{len(rows)} people with no photo — {linked} with a website on file, {len(rows) - linked} to search for.
-Client-linked and emergency contacts excluded; {skipped_orgs} organisations dropped.
+<div class=sub>{len(rows)} contacts with no photo — {linked} with a website on file, {len(rows) - linked} to search for.
+Client-linked and emergency contacts excluded; nothing else is filtered out.
 Open a link — the row marks itself <b>opened</b> so you can see where you stopped — clip it, then tick it off.
 Progress saves in this browser. Rerun <code>scripts/worklist.py</code> to drop the ones already done.</div>
 <div id=bar><b><span id=n>0</span> / {len(rows)}</b> <span id=o></span> &nbsp;

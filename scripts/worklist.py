@@ -6,9 +6,15 @@ can be regenerated mid-job to see what is left. Reads only; writes one HTML
 file. Client-linked and emergency contacts are excluded by construction —
 looking up a client's family member online is not what this is for.
 
+The one criterion is a missing photo. Contacts with a website on file link
+straight to it; the rest get a search link, which is slower but is the same
+move by hand. Names that read as an organisation rather than a person are
+dropped — a practice has a logo, not a headshot.
+
     python3 scripts/worklist.py [output.html]
 """
 import sys, os, glob, re, html
+from urllib.parse import quote_plus
 
 CONTACTS = os.path.expanduser(
     "~/Library/CloudStorage/GoogleDrive-me@carlwilliamson.com/My Drive/"
@@ -26,27 +32,42 @@ def prop(text, name):
     m = re.search(rf"^{name}(?:;[^:\r\n]*)?:(.*)$", text, re.M)
     return m.group(1).strip() if m else ""
 
-rows = []
+# A practice or clinic has a logo, not a headshot, so those cards are not work
+# this list can close out. Four or more words is the other tell.
+ORGWORD = re.compile(
+    r"\b(inc|llc|pllc|ltd|cent(er|re)s?|associates?|association|group|institute|clinics?|"
+    r"services|solutions|partners|counseling|therapy|psychological|psychiatry|health|"
+    r"wellness|foundation|society|network|academy|school|university|hospital|company)\b", re.I)
+
+rows, skipped_orgs = [], 0
 for path in sorted(glob.glob(os.path.join(CONTACTS, "**", "*.vcf"), recursive=True)):
     t = unfold(open(path, encoding="utf-8", errors="replace").read())
     if "PHOTO" in t:
         continue
     if re.search(r"^X-(OWNER-CLIENT-FOLDER|LINKED-CLIENT)", t, re.M):
         continue
-    u = prop(t, "URL").replace("\\:", ":").replace("\\,", ",")
-    if not u or u.startswith("fb://"):
-        continue
-    if not re.match(r"^https?://", u, re.I):
-        u = "https://" + u.lstrip("/")
     name = prop(t, "FN") or os.path.basename(path)[:-4]
+    if ORGWORD.search(name) or len(name.split()) > 4:
+        skipped_orgs += 1
+        continue
     org = prop(t, "ORG").replace("\\,", ",").rstrip(";")
+    u = prop(t, "URL").replace("\\:", ":").replace("\\,", ",")
+    if u and not u.startswith("fb://"):
+        if not re.match(r"^https?://", u, re.I):
+            u = "https://" + u.lstrip("/")
+        dom = re.sub(r"^https?://(www\.)?", "", u, flags=re.I).split("/")[0].lower()
+    else:
+        # No site on file: hand over the search you would have typed anyway.
+        u = "https://www.google.com/search?q=" + quote_plus(f"{name} {org}".strip())
+        dom = ""
     missing = [f for f, pat in (("email", r"^EMAIL"), ("phone", r"^TEL"), ("org", r"^ORG"))
                if not re.search(pat, t, re.M)]
-    dom = re.sub(r"^https?://(www\.)?", "", u, flags=re.I).split("/")[0].lower()
     rows.append((name, u, dom, org, missing))
 
-# Same-layout sites together, so the clipping rhythm settles.
-rows.sort(key=lambda r: (r[2] != "psychologytoday.com", r[2], r[0].lower()))
+# Same-layout sites together, so the clipping rhythm settles; the ones with no
+# site on file go last, since each is a search rather than a click.
+rows.sort(key=lambda r: (not r[2], r[2] != "psychologytoday.com", r[2], r[0].lower()))
+linked = sum(1 for r in rows if r[2])
 
 parts = [f"""<title>Contact photo worklist</title>
 <style>
@@ -57,13 +78,15 @@ parts = [f"""<title>Contact photo worklist</title>
  li.seen{{background:#fdf6e6;box-shadow:inset 3px 0 #d9a441}}
  li.done{{opacity:.4;text-decoration:line-through;background:none;box-shadow:none}}
  a{{font-weight:600;color:#186}} .dom{{color:#888;font-size:12px}} .miss{{color:#a60;font-size:12px}}
+ .nosite{{color:#7a7a86;font-style:italic}}
  .flag{{display:none;color:#96702a;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}}
  li.seen:not(.done) .flag{{display:inline}}
  input{{transform:scale(1.2)}} #bar{{position:sticky;top:0;background:#fff;padding:.6rem 0;border-bottom:1px solid #ddd}}
  #o{{color:#96702a;font-weight:600}}
 </style>
 <h1>Contact photo worklist</h1>
-<div class=sub>{len(rows)} contacts with a website and no photo. Client-linked and emergency contacts excluded.
+<div class=sub>{len(rows)} people with no photo — {linked} with a website on file, {len(rows) - linked} to search for.
+Client-linked and emergency contacts excluded; {skipped_orgs} organisations dropped.
 Open a link — the row marks itself <b>opened</b> so you can see where you stopped — clip it, then tick it off.
 Progress saves in this browser. Rerun <code>scripts/worklist.py</code> to drop the ones already done.</div>
 <div id=bar><b><span id=n>0</span> / {len(rows)}</b> <span id=o></span> &nbsp;
@@ -72,9 +95,11 @@ Progress saves in this browser. Rerun <code>scripts/worklist.py</code> to drop t
 for name, u, dom, org, missing in rows:
     extra = f' <span class=miss>also missing: {", ".join(missing)}</span>' if missing else ""
     o = f' <span class=dom>· {html.escape(org)}</span>' if org else ""
+    d = (f'<span class=dom>{html.escape(dom)}</span>' if dom
+         else '<span class="dom nosite">no site on file — search</span>')
     parts.append(f'<li data-k="{html.escape(name)}"><input type=checkbox>'
                  f'<span><a href="{html.escape(u)}" target=_blank rel=noopener>{html.escape(name)}</a>'
-                 f'{o} <span class=dom>{html.escape(dom)}</span>{extra}'
+                 f'{o} {d}{extra}'
                  f' <span class=flag>opened</span></span></li>')
 parts.append("""</ol>
 <script>

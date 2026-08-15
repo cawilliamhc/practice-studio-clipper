@@ -45,13 +45,29 @@ def prop(text, name):
     m = re.search(rf"^{name}(?:;[^:\r\n]*)?:(.*)$", text, re.M)
     return m.group(1).strip() if m else ""
 
-rows, skipped = [], {}
-for path in sorted(glob.glob(os.path.join(CONTACTS, "**", "*.vcf"), recursive=True)):
-    t = unfold(open(path, encoding="utf-8", errors="replace").read())
+# Top level only, no recursion. Practice Studio itself never descends here
+# (readContactsFolder filters out directories), so anything in a subfolder is
+# not a contact — the _org-fix-backup-* folders hold pre-fix copies of cards
+# that have since gained photos, and recursing listed people as unphotographed
+# on the strength of a stale duplicate.
+cards = []
+for path in sorted(glob.glob(os.path.join(CONTACTS, "*.vcf"))):
+    cards.append((path, unfold(open(path, encoding="utf-8", errors="replace").read())))
+
+# A name is done if any card for it carries a photo, whatever the card being
+# read says. Two cards for one person is a merge problem, not a photo problem,
+# and it should not put them back on the list.
+photographed = {prop(t, "FN") for _, t in cards if "PHOTO" in t}
+
+rows, skipped, seen = [], {}, set()
+for path, t in cards:
     if "PHOTO" in t:
         continue
     if re.search(r"^X-(OWNER-CLIENT-FOLDER|LINKED-CLIENT)", t, re.M):
         continue
+    if prop(t, "FN") in photographed or prop(t, "FN") in seen:
+        continue
+    seen.add(prop(t, "FN"))
     kind = prop(t, "X-CONTACT-TYPE").lower() or "unset"
     if CLINICIANS_ONLY and kind not in CLINICIAN_TYPES:
         skipped[kind] = skipped.get(kind, 0) + 1

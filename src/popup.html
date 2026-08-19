@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Clip therapist contact</title>
+    <title>Practice Studio Clipper</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -156,6 +156,39 @@
       #status { margin-top: 8px; font-size: 11px; min-height: 14px; }
       #status.ok { color: var(--ok); }
       #status.err { color: var(--err); }
+      #mode-switch {
+        display: flex;
+        gap: 4px;
+        margin: 0 0 12px;
+        padding: 3px;
+        border-radius: 6px;
+        background: var(--field-bg);
+        border: 1px solid var(--border);
+      }
+      #mode-switch button {
+        width: auto;
+        flex: 1;
+        margin: 0;
+        padding: 5px 8px;
+        border-radius: 4px;
+        background: none;
+        color: var(--muted);
+        font-weight: 500;
+      }
+      #mode-switch button[aria-pressed="true"] {
+        background: var(--accent);
+        color: var(--accent-fg);
+      }
+      /* A cover is portrait, unlike the square headshot above. */
+      .cover img {
+        width: 52px;
+        height: 78px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        object-fit: cover;
+        flex: none;
+        background: var(--field-bg);
+      }
       .note {
         margin-top: 10px;
         padding-top: 9px;
@@ -166,6 +199,12 @@
     </style>
   </head>
   <body>
+    <div id="mode-switch" role="group" aria-label="What to clip">
+      <button type="button" data-mode="contact" aria-pressed="true">Contact</button>
+      <button type="button" data-mode="book" aria-pressed="false">Book</button>
+    </div>
+
+    <div id="contact-pane" hidden>
     <h1>Clip therapist contact</h1>
     <p class="sub" id="page-url">Reading page…</p>
     <p class="prior" id="prior" hidden></p>
@@ -189,6 +228,27 @@
       Saves to <code>Downloads/ps-contact-inbox/</code>, then import it in Practice Studio.
       Everything is filed as a mental health provider.
     </p>
-    <script type="module" src="popup.js"></script>
+    </div>
+
+    <div id="book-pane" hidden>
+      <h1>Clip a book</h1>
+      <p class="prior" id="book-prior" hidden></p>
+      <div class="photo cover" id="cover" hidden>
+        <img id="cover-img" alt="Cover found on the page" />
+        <div class="photo-meta">
+          <span class="src" id="cover-src"></span>
+          <button type="button" class="link" id="cover-clear">Don't include</button>
+        </div>
+      </div>
+      <form id="book-form"></form>
+      <button id="book-save" type="button" disabled>Save to library inbox</button>
+      <p id="book-status" role="status"></p>
+      <p class="note">
+        Saves to <code>Downloads/ps-library-inbox/</code>, then import it in Practice Studio's
+        Library. Only the book — who borrows it is recorded in the app.
+      </p>
+    </div>
+
+    <script type="module" src="popup-main.js"></script>
   </body>
 </html>

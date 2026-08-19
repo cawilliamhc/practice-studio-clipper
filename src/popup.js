@@ -6,6 +6,7 @@
 // document context, which a MV3 service worker doesn't have.
 import { buildVCard, displayName, photoFileName, vcardFileName } from "./vcard.js";
 import { normalizeWithLocalModel } from "./llm.js";
+import { runInActiveTab } from "./active-tab.js";
 import {
   describePriorClip,
   findPriorClip,
@@ -29,6 +30,7 @@ const FIELDS = [
   ["address", "Location"],
 ];
 
+const pane = document.getElementById("contact-pane");
 const form = document.getElementById("form");
 const saveButton = document.getElementById("save");
 const status = document.getElementById("status");
@@ -220,19 +222,7 @@ function refreshPriorNotice() {
   prior.hidden = !message;
 }
 
-async function scrapeActiveTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab.");
-  if (/^(chrome|vivaldi|edge|about|chrome-extension):/i.test(tab.url || "")) {
-    throw new Error("This page can't be clipped — open the therapist's site first.");
-  }
-  const [injection] = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    files: ["src/scrape.js"],
-  });
-  if (!injection?.result) throw new Error("Couldn't read that page.");
-  return injection.result;
-}
+const scrapeActiveTab = () => runInActiveTab("src/scrape.js");
 
 async function save() {
   const fields = currentFields();
@@ -326,7 +316,14 @@ useModel.addEventListener("change", async () => {
   if (useModel.checked && scraped) await runLocalModel();
 });
 
-(async () => {
+let started = false;
+
+/** Reads the page and fills the pane. Safe to call again — switching back
+ *  from book mode shouldn't re-scrape. */
+export async function startContactMode() {
+  pane.hidden = false;
+  if (started) return;
+  started = true;
   try {
     useModel.checked = await loadUseModelPreference();
     clipHistory = await loadClipHistory();
@@ -345,4 +342,8 @@ useModel.addEventListener("change", async () => {
     pageUrl.textContent = "";
     setStatus(err?.message || "Something went wrong.", "err");
   }
-})();
+}
+
+export function hideContactMode() {
+  pane.hidden = true;
+}

@@ -1,10 +1,17 @@
 {
   "manifest_version": 3,
   "name": "Practice Studio Clipper",
-  "version": "0.1.0",
-  "description": "Clips a therapist's website into a vCard for Practice Studio's contact inbox.",
-  "permissions": ["activeTab", "scripting", "downloads", "storage"],
-  "host_permissions": ["http://localhost:1234/*"],
+  "version": "0.2.0",
+  "description": "Clips a therapist's website into a vCard, or a book page into a library record, for Practice Studio.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "downloads",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:1234/*"
+  ],
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -13,7 +20,7 @@
   },
   "action": {
     "default_popup": "src/popup.html",
-    "default_title": "Clip therapist contact",
+    "default_title": "Clip for Practice Studio",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

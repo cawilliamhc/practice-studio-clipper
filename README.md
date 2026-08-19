@@ -1,21 +1,104 @@
 # Practice Studio Clipper
 
-A Chrome/Vivaldi extension that reads a therapist's website, shows you what it found, and
-writes a vCard into an inbox folder for Practice Studio to import.
+A Chrome/Vivaldi extension that reads the page you're on and writes a file into an inbox
+folder for Practice Studio to import. Two things it can read:
 
-Every card is filed as a **mental health provider** (`X-CONTACT-TYPE:therapist`).
+- **Contact** — a therapist's website becomes a vCard, filed as a **mental health provider**
+  (`X-CONTACT-TYPE:therapist`). This is most of what the extension does.
+- **Book** — a book page becomes a `.book.json` for the lending library.
 
-## Status — step 1 of 4
+The popup opens on whichever the page looks like: a page that declares itself a book
+(schema.org `Book`, `og:type=book`, or one of the shops in `scrape-book.js`) starts on
+**Book**, everything else on **Contact**. The switch at the top is always there, and the
+guess is never binding.
+
+## Status
+
+Contacts, in four steps, all done:
 
 - [x] **Step 1** — extension skeleton, deterministic scrape, `.vcf` download
 - [x] **Step 2** — `contactInboxPath` setting + "Import from inbox" in Practice Studio
 - [x] **Step 3** — LM Studio normalizer for what the deterministic tiers miss
 - [x] **Step 4** — clip history ("you clipped this page 3 days ago")
 
+Books, added August 2026: the book pane, `scrape-book.js`, and the matching importer in
+Practice Studio's Library. No local-model step — there is nothing on a book page worth
+guessing at.
+
 **One-time setup:** in Practice Studio, open **Contacts → settings → Contact inbox folder**,
-choose `~/Downloads/ps-contact-inbox`, and save. "Import from inbox" then appears in the
-same panel and reviews everything waiting there in one pass. Imported cards move to an
+choose `~/Downloads/ps-contact-inbox`, and save; then **Library → settings → Choose folder**
+for `~/Downloads/ps-library-inbox`. "Import from inbox" appears in each panel once its
+folder is set, and reviews everything waiting there in one pass. Imported files move to an
 `_imported` folder inside the inbox rather than being deleted.
+
+## Books
+
+Open a book's page, switch to **Book** if it didn't open there, check the three fields, and
+**Save to library inbox** → `~/Downloads/ps-library-inbox/anchors-and-sails.book.json`. In
+Practice Studio: **Library → the settings button → Import from inbox**.
+
+The cover downloads beside the record and the record names the file it *actually* landed
+under, the same uniquify dance the headshot path does.
+
+### What's read
+
+Tiers, most trustworthy first, and the popup names the one each field came from:
+
+1. **JSON-LD** — `Book` first, then a `Product` wrapper; `workExample` is consulted for an
+   edition's ISBN. Nested nodes are searched, so a `Book` hanging off a `Product` is found.
+2. **The page**, for the three shops actually used (Amazon, Goodreads, Bookshop.org) — a
+   short table of selectors in `scrape-book.js`, plus an ISBN pattern read out of the page
+   text where those sites bury it in a detail list.
+3. **Meta tags** — `og:title`, `books:author`, `books:isbn`, `og:image`.
+
+Anywhere else, the title comes from the page's `<h1>` and the author is left blank on
+purpose: a wrong author is worse than a missing one, and every field is editable before
+saving.
+
+### What's cleaned up, and what isn't
+
+`book.js` holds the cleanup, and it's conservative:
+
+- **Subtitles are kept.** They're part of the title and often the only thing separating two
+  similar books. Only clauses that are unambiguously about a *listing* go — a trailing
+  format ("— Paperback, January 3 2021", "(Hardcover)") and a trailing site name
+  ("| Bookshop.org").
+- **One author.** The app stores a single author line, so a multi-author byline keeps the
+  first. `by`, `(Author)`, and "Visit …'s Page" furniture is stripped. A comma is *not* a
+  separator — "Vantree, R." is one person written surname-first.
+- **ISBNs are validated, not just cleaned.** 10 or 13 digits (a trailing `X` is a real check
+  digit); anything else is dropped rather than stored. It's the dedupe key on import, and a
+  mangled number matches nothing while looking authoritative.
+
+### What the record contains
+
+```json
+{
+  "kind": "practice-studio/library-book",
+  "version": 1,
+  "title": "Anchors and Sails: A Field Guide",
+  "author": "R. Vantree",
+  "isbn": "9781402894626",
+  "cover_file": "anchors-and-sails.jpg",
+  "source_url": "https://…",
+  "clipped_at": "2026-08-19T12:00:00.000Z"
+}
+```
+
+A title, who wrote it, a number, and a picture. **Nothing about who a book is for.** The
+loan is recorded in the app, where the roster already lives — the extension never learns a
+client exists. That's why this goes through a file drop rather than an endpoint into the
+app: a port open on a machine holding clinical records, reachable by every page in the
+browser, would be a real surface; a folder of book titles is not.
+
+### On import
+
+Practice Studio matches a clipped book against the shelf by **ISBN** first, then by title
+and author. Two ISBNs that disagree are two editions, and a title match doesn't override
+that. Import only ever **fills blanks** — an author already recorded was typed or corrected
+by a person, and a retailer's byline isn't better information. Consumed files move to
+`_imported/` inside the inbox rather than being deleted, and anything in the folder that
+isn't a clipped book is left alone.
 
 ## Installing
 
@@ -26,7 +109,7 @@ It's an unpacked MV3 extension — no build step.
 
 Reload the extension from that page after editing any file.
 
-## Using it
+## Using it — contacts
 
 1. Open a therapist's site or directory profile
 2. Click the toolbar button

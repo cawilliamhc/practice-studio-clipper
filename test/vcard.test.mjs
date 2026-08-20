@@ -38,12 +38,19 @@ describe("buildVCard", () => {
     assert.ok(!card.includes("\n\n"));
   });
 
-  test("appends credentials to the display name", () => {
-    assert.ok(build().includes("FN:Rowan Aldridge\\, LCSW"));
+  // FN is the bare name; the letters go in their own property, and in N's
+  // suffix component for address books that never heard of X-CREDENTIALS.
+  test("keeps credentials out of the display name", () => {
+    assert.ok(build().includes("FN:Rowan Aldridge\r\n"));
+    assert.ok(build().includes("X-CREDENTIALS:LCSW"));
+    assert.ok(build().includes("N:Rowan Aldridge;;;;LCSW"));
   });
 
-  test("omits the credential separator when there are none", () => {
-    assert.ok(build({ credentials: "" }).includes("FN:Rowan Aldridge\r\n"));
+  test("writes no credential property when there are none", () => {
+    const card = build({ credentials: "" });
+    assert.ok(card.includes("FN:Rowan Aldridge\r\n"));
+    assert.ok(!card.includes("X-CREDENTIALS"));
+    assert.ok(card.includes("N:Rowan Aldridge;;;;\r\n"));
   });
 
   test("always files the contact as a mental health provider", () => {

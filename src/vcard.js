@@ -9,10 +9,21 @@
 //     ours. The app reads the property directly as of the contact-inbox work,
 //     so the NOTE copy would now just restate a field the contact already has.
 //
-//   * Credentials stay appended to FN rather than riding in a custom property.
-//     The app has no credentials field, and its name matcher already strips
-//     post-nominals, so "Rowan Aldridge, LCSW" still matches an existing
-//     "Rowan Aldridge" instead of creating a duplicate.
+//   * Credentials ride in X-CREDENTIALS, and FN carries the bare name. They
+//     used to be pasted onto FN because the app had no credentials field;
+//     it does now, so pasting them on would mean the app splitting apart a
+//     string this file had just joined. They are ALSO written into N's suffix
+//     component, which is where the vCard spec puts post-nominals, so a card
+//     opened in an ordinary address book still shows them.
+//
+//     Note the version coupling this creates: a Practice Studio build older
+//     than the credentials field ignores X-CREDENTIALS, so a card written here
+//     lands there with the letters missing. Nothing is corrupted and re-saving
+//     from the clipper fixes it — but update the two together.
+//
+//     The filename still uses the combined form (see vcardFileName): two
+//     colleagues can share a name, and the letters are what tell the files
+//     apart on disk.
 
 const LINE_LENGTH = 75;
 
@@ -79,19 +90,24 @@ function noteLines(fields) {
  * fresh random one on every folder scan for cards that lack it.
  */
 export function buildVCard(fields, { uid, photoFileName = "" } = {}) {
-  const name = displayName(fields);
+  const name = (fields.fullName || "").trim();
   if (!name) throw new Error("A contact needs a name.");
+  const credentials = (fields.credentials || "").trim();
 
   const lines = ["BEGIN:VCARD", "VERSION:3.0"];
   lines.push(`UID:${escapeText(uid || crypto.randomUUID())}`);
   lines.push(`FN:${escapeText(name)}`);
-  lines.push(`N:${escapeText(name)};;;;`); // write-only, for stricter importers
+  // N is Family;Given;Additional;Prefix;Suffix. The whole name has always gone
+  // in the first component rather than being split into parts this scraper
+  // cannot reliably tell apart; the suffix, though, we do know.
+  lines.push(`N:${escapeText(name)};;;;${escapeText(credentials)}`); // write-only, for stricter importers
 
   const push = (property, value) => {
     const trimmed = (value || "").trim();
     if (trimmed) lines.push(`${property}:${escapeText(trimmed)}`);
   };
 
+  push("X-CREDENTIALS", fields.credentials);
   push("ORG", fields.organization);
   push("TEL;TYPE=WORK", fields.phone);
   push("EMAIL;TYPE=INTERNET", fields.email);

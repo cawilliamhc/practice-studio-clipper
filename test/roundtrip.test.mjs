@@ -43,7 +43,9 @@ describe("Practice Studio reads what the clipper writes", { skip: !available && 
   test("core fields survive the round trip", () => {
     const parsed = parseVCard(card());
     assert.equal(parsed.id, "abc-123");
-    assert.equal(parsed.fullName, "Mira Okonjo, LMFT");
+    // Name and credentials arrive as two fields now, not one string.
+    assert.equal(parsed.fullName, "Mira Okonjo");
+    assert.equal(parsed.credentials, "LMFT");
     assert.equal(parsed.organization, "Northgate Family Therapy, LLC");
     assert.equal(parsed.phone, "(555) 010-2288");
     assert.equal(parsed.email, "mira@northgate.example");
@@ -96,8 +98,9 @@ describe("Practice Studio reads what the clipper writes", { skip: !available && 
     const cards = splitVCards(one + two);
     assert.equal(cards.length, 2);
     assert.deepEqual(cards.map((c) => parseVCard(c).fullName), [
-      "Devi Ramanathan, LPC",
-      "Soren Blackwell, LCSW",
+      "Devi Ramanathan",
+      "Soren Blackwell",
     ]);
+    assert.deepEqual(cards.map((c) => parseVCard(c).credentials), ["LPC", "LCSW"]);
   });
 });

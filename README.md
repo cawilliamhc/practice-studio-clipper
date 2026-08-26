@@ -113,24 +113,40 @@ Two consequences worth knowing:
 
 - **`default_popup` is gone from the manifest.** With it set, the toolbar click
   opens a popup and the panel never gets a look in. `background.js` handles
-  `action.onClicked` and opens the panel itself.
-- **It deliberately does NOT use `setPanelBehavior({ openPanelOnActionClick })`**,
-  which is the obvious way to do this and was the first thing tried. That makes
-  the *browser* handle the click, so no event reaches the extension and
-  `activeTab` is never granted — the panel opened perfectly and every scrape
-  failed with "Cannot access contents of the page" on ordinary therapist sites.
-  Handling the click ourselves makes it an extension invocation, which is what
-  grants the permission to read that tab.
-- **The grant is per tab**, and that is the tradeoff for keeping `activeTab`
-  instead of asking for `<all_urls>`. The extension can read a page only on a
-  tab where you clicked the button — never any tab at any time. So browsing to
-  a second therapist and pressing "Read this page" reads nothing: click the
-  toolbar button on that tab instead. The status line says so.
+  `action.onClicked` and opens the panel itself. It deliberately does not use
+  `setPanelBehavior({ openPanelOnActionClick: true })`, which makes the
+  *browser* handle the click so no event reaches the extension at all.
 - **"Read this page"** sits under the page URL. The panel outlives the page it
   was opened on, so it needs a way to be pointed at whatever tab you are on
   now. It is a button and not automatic on tab change on purpose: a re-read
   overwrites every field, and doing that to someone mid-edit because they
   glanced at another tab would undo the reason the panel exists.
+
+### Why this needs host permissions
+
+The extension used to run on `activeTab` — permission to read a page granted
+by clicking the toolbar button on it, and only for that tab. That is a nicely
+narrow model and it is **structurally incompatible with a panel that stays
+open**: the whole point is browsing to other tabs while the form sits there,
+and a per-invocation grant never covers them. Every attempt to keep it failed
+the same way, with the panel opening fine and every read refused.
+
+So the extension now declares `host_permissions` for `http://*/*` and
+`https://*/*`. What that changed, stated plainly: it *could* read any ordinary
+web page at any time, where before it could only read one you had invoked it
+on. It doesn't — the only injection sites are `scrape.js` and
+`scrape-book.js`, both run from `runInActiveTab` on an explicit click — but
+the capability is now standing rather than granted per use.
+
+That was judged the right trade for this extension specifically: it is
+unlisted, runs on one machine, is used by the person who wrote it, and reading
+arbitrary therapist websites is its entire job. It would be the wrong trade for
+anything published.
+
+One thing it improved: the guard against browser pages finally works. `tab.url`
+was itself permission-gated under `activeTab`, so on exactly the pages worth
+rejecting the guard saw `undefined` and waved them through — Chrome then
+refused the injection with its own wording, which read like a crash.
 
 The side panel API is Chrome 114+. Vivaldi is Chromium-based but does not
 reliably expose it to extensions, so treat Chrome as the supported browser for

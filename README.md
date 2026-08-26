@@ -216,6 +216,33 @@ block first, the object is salvaged rather than the clip being lost. When nothin
 comes back the status line quotes what it actually said, and the full reply goes to the
 popup's console (right-click → Inspect).
 
+### Thinking models
+
+Qwen3.5 and its relatives think by **default**, and LM Studio puts that block in a separate
+`reasoning_content` field rather than in `content`. Asked for a small JSON object, the model
+would spend the whole reply thinking, leave `content` empty, and the clip that had actually
+worked came back as *"The model returned an empty reply"* — with the finished object sitting
+in the other field.
+
+The request now ends with an assistant turn containing an already-closed empty `<think>`
+block, so the next thing the model writes is the object. Measured against `qwen3.5-9b-mlx`
+on the same page:
+
+| | time | reasoning tokens | result |
+|---|---|---|---|
+| without the prefill | 27.7s | 57 | `content` empty, answer stranded |
+| with the prefill | 4.7s | 0 | answer in `content` |
+
+Things that do **not** fix it, all tried: the JSON schema (a constrained reply may still
+think first), a bigger `max_tokens` (the model doesn't stop — 1599 tokens and 91 seconds
+still produced nothing), `/no_think` (that's the Qwen3 switch; Qwen3.5 ignores it), and
+`chat_template_kwargs: {enable_thinking: false}` (the documented parameter, which LM Studio
+drops — vLLM and SGLang do honour it).
+
+`replyText` reads `reasoning_content` as a fallback in case a model thinks anyway, and if
+nothing usable comes back at all the status line now names the setting: **Inference →
+Reasoning → Enable Thinking**, which is a per-model toggle in LM Studio and defaults to on.
+
 Requirements: LM Studio running with a chat model loaded. The model is auto-selected from
 `/v1/models` (embedding models skipped), so there's no id to keep in sync. If the server
 isn't running, the clip still works — the status line says so and the deterministic fields

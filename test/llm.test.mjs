@@ -6,6 +6,8 @@ import assert from "node:assert/strict";
 import {
   buildRequest,
   comparisonForm,
+  emptyReplyMessage,
+  replyText,
   extractJsonObject,
   FILLABLE_FIELDS,
   missingFields,
@@ -199,5 +201,54 @@ describe("comparisonForm", () => {
 
   test("tolerates null", () => {
     assert.equal(comparisonForm(null), "");
+  });
+});
+
+// Qwen3.5 and its relatives think by default, and LM Studio routes that
+// block to `reasoning_content` — which is how a clip that WORKED came back
+// as "The model returned an empty reply".
+describe("thinking models", () => {
+  test("the request hands the model a spent thinking block", () => {
+    const req = buildRequest(PAGE, ["organization"], "qwen3.5-9b-mlx");
+    const last = req.messages.at(-1);
+    assert.equal(last.role, "assistant");
+    assert.match(last.content, /^<think>\s*<\/think>/);
+  });
+
+  test("the prefill comes after the page text, not before it", () => {
+    const roles = buildRequest(PAGE, ["organization"], "m").messages.map((m) => m.role);
+    assert.deepEqual(roles, ["system", "user", "assistant"]);
+  });
+
+  test("replyText reads content when it is there", () => {
+    assert.equal(replyText({ content: '{"a":1}' }), '{"a":1}');
+  });
+
+  test("replyText falls back to reasoning_content", () => {
+    assert.equal(replyText({ content: "", reasoning_content: '{"a":1}' }), '{"a":1}');
+  });
+
+  // A lone newline after a think block passes a bare truthiness check and
+  // then fails to parse, which reads as malformed rather than as empty.
+  test("replyText treats whitespace-only content as empty", () => {
+    assert.equal(replyText({ content: "\n\n", reasoning_content: '{"a":1}' }), '{"a":1}');
+  });
+
+  test("replyText survives a missing message", () => {
+    assert.equal(replyText(undefined), "");
+    assert.equal(replyText({}), "");
+  });
+
+  test("an all-thinking reply names the setting that caused it", () => {
+    const msg = emptyReplyMessage({ completion_tokens_details: { reasoning_tokens: 57 } });
+    assert.match(msg, /Enable Thinking/);
+  });
+
+  test("a genuinely empty reply is not blamed on thinking", () => {
+    assert.equal(
+      emptyReplyMessage({ completion_tokens_details: { reasoning_tokens: 0 } }),
+      "The model returned an empty reply."
+    );
+    assert.equal(emptyReplyMessage(undefined), "The model returned an empty reply.");
   });
 });

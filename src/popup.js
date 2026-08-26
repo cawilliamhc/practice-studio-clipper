@@ -4,7 +4,7 @@
 // two reasons: activeTab's permission is granted by the toolbar click that
 // opened this popup, and blob/data URL creation for the download needs a
 // document context, which a MV3 service worker doesn't have.
-import { buildVCard, displayName, photoFileName, vcardFileName } from "./vcard.js";
+import { buildVCard, displayName, normalizePhone, photoFileName, vcardFileName } from "./vcard.js";
 import { normalizeWithLocalModel } from "./llm.js";
 import { runInActiveTab } from "./active-tab.js";
 import {
@@ -35,6 +35,7 @@ const form = document.getElementById("form");
 const saveButton = document.getElementById("save");
 const status = document.getElementById("status");
 const pageUrl = document.getElementById("page-url");
+const reread = document.getElementById("reread");
 const useModel = document.getElementById("use-model");
 const prior = document.getElementById("prior");
 const photoBlock = document.getElementById("photo");
@@ -324,10 +325,30 @@ export async function startContactMode() {
   pane.hidden = false;
   if (started) return;
   started = true;
+  await readPage();
+}
+
+/**
+ * Reads whatever tab is in front now and fills the form from it.
+ *
+ * Split out of startContactMode when the popup became a side panel. A popup
+ * was opened on the page it read and died with it, so one read was the whole
+ * story; a panel stays docked while you browse, so the page it first read and
+ * the page you are looking at drift apart.
+ *
+ * Wired to a button rather than to tab changes on purpose. This overwrites
+ * every field, so doing it automatically would throw away someone's typing
+ * because they glanced at another tab — and the reason the panel exists at
+ * all is to stop the form being destroyed by clicking away from it.
+ */
+async function readPage() {
   try {
     useModel.checked = await loadUseModelPreference();
     clipHistory = await loadClipHistory();
     scraped = await scrapeActiveTab();
+    // Tidied before anything sees it, so the field you read, the field you
+    // edit, and the number written into the .vcf are all the same string.
+    scraped.fields.phone = normalizePhone(scraped.fields.phone);
     pageUrl.textContent = scraped.sourceUrl;
     render(scraped.fields, scraped.sources);
     showPhoto(scraped.fields.photoUrl, scraped.sources.photoUrl);
@@ -343,6 +364,17 @@ export async function startContactMode() {
     setStatus(err?.message || "Something went wrong.", "err");
   }
 }
+
+reread.addEventListener("click", async () => {
+  reread.disabled = true;
+  reread.textContent = "Reading…";
+  try {
+    await readPage();
+  } finally {
+    reread.disabled = false;
+    reread.textContent = "Read this page";
+  }
+});
 
 export function hideContactMode() {
   pane.hidden = true;

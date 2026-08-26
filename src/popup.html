@@ -34,7 +34,16 @@
       }
       * { box-sizing: border-box; }
       body {
-        width: 360px;
+        /* Was a fixed 360px, which is what a popup gets. A side panel is
+           resizable by the user, so this follows the panel instead — with a
+           floor so a very narrow drag doesn't collapse the form, and a
+           ceiling so a wide one doesn't stretch the fields across the screen. */
+        width: 100%;
+        /* Under anything the panel can realistically be dragged to, so the
+           floor never itself causes a horizontal scrollbar; it exists only to
+           stop a total collapse. */
+        min-width: 260px;
+        max-width: 560px;
         margin: 0;
         padding: 14px;
         background: var(--bg);
@@ -156,6 +165,17 @@
       #status { margin-top: 8px; font-size: 11px; min-height: 14px; }
       #status.ok { color: var(--ok); }
       #status.err { color: var(--err); }
+      .link-button {
+        margin: 0 0 8px;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: var(--accent);
+        font: inherit;
+        cursor: pointer;
+        text-decoration: underline;
+      }
+      .link-button:disabled { color: var(--muted); cursor: default; }
       #mode-switch {
         display: flex;
         gap: 4px;
@@ -207,6 +227,13 @@
     <div id="contact-pane" hidden>
     <h1>Clip therapist contact</h1>
     <p class="sub" id="page-url">Reading page…</p>
+    <!-- Only meaningful now the panel outlives the page it was opened on: it
+         stays put while you browse, so it needs a way to be pointed at
+         whatever tab you are on now. Deliberately a button and not automatic
+         on tab change — a re-scrape overwrites the form, and doing that to
+         someone mid-edit because they glanced at another tab would be worse
+         than making them ask. -->
+    <button type="button" id="reread" class="link-button">Read this page</button>
     <p class="prior" id="prior" hidden></p>
     <label class="toggle">
       <input type="checkbox" id="use-model" />

@@ -100,6 +100,31 @@ by a person, and a retailer's byline isn't better information. Consumed files mo
 `_imported/` inside the inbox rather than being deleted, and anything in the folder that
 isn't a clipped book is left alone.
 
+## The side panel
+
+The clipper opens as a **side panel**, docked beside the page, not as a popup.
+
+That is not cosmetic. A popup closes the instant it loses focus — browser
+behaviour, not a setting — so clicking into the page to copy a sentence threw
+away everything already typed into the form. The panel stays put, so the site
+and the form are usable at the same time.
+
+Two consequences worth knowing:
+
+- **`default_popup` is gone from the manifest.** With it set, the toolbar click
+  opens a popup and the panel never gets a look in. `background.js` sets
+  `openPanelOnActionClick` instead, with an `action.onClicked` fallback for a
+  build that has the API but ignores that flag.
+- **"Read this page"** sits under the page URL. The panel outlives the page it
+  was opened on, so it needs a way to be pointed at whatever tab you are on
+  now. It is a button and not automatic on tab change on purpose: a re-read
+  overwrites every field, and doing that to someone mid-edit because they
+  glanced at another tab would undo the reason the panel exists.
+
+The side panel API is Chrome 114+. Vivaldi is Chromium-based but does not
+reliably expose it to extensions, so treat Chrome as the supported browser for
+now.
+
 ## Installing
 
 It's an unpacked MV3 extension — no build step.
@@ -121,6 +146,26 @@ Reload the extension from that page after editing any file.
 Same-name files get a numeric suffix rather than overwriting. Practice Studio's importer
 matches on name and only fills blank fields, so re-clipping someone updates rather than
 duplicates them.
+
+## Phone numbers
+
+Whatever the page gives is normalised to one house format, `(555) 010-2288`,
+before it reaches the form — so the number you read, the number you edit, and
+the number written into the `.vcf` are the same string. A `tel:` href gives
+bare digits; page text gives whatever the designer typed, including
+non-breaking spaces, en dashes, a `Call:` prefix, or an office and a mobile
+run together with nothing between them.
+
+**It never invents one.** A phone number in a referral directory gets dialled,
+so anything that can't be read confidently as a 10-digit North American number
+comes through with its whitespace collapsed and nothing else touched — visibly
+odd, which beats confidently wrong. International numbers pass through as
+written. An extension is kept and normalised to `ext.`
+
+The rule that this splits two jammed numbers only when **both halves** look
+like real numbers is load-bearing, and a test earned it: taking the first ten
+digits of any long run turned `+44 20 7946 0018` into `(442) 079-4600` — a
+number that dials someone, invented out of a number that didn't.
 
 ## How it extracts
 

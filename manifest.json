@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Practice Studio Clipper",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Clips a therapist's website into a vCard, or a book page into a library record, for Practice Studio.",
   "permissions": [
     "activeTab",
-    "scripting",
     "downloads",
+    "scripting",
+    "sidePanel",
     "storage"
   ],
   "host_permissions": [
@@ -19,7 +20,6 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_popup": "src/popup.html",
     "default_title": "Clip for Practice Studio",
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -27,5 +27,12 @@
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     }
+  },
+  "side_panel": {
+    "default_path": "src/popup.html"
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
   }
 }

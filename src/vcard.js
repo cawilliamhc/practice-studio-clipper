@@ -62,6 +62,72 @@ export function slugify(value, fallback = "contact") {
 }
 
 /** "Rowan Aldridge" + "LCSW" -> "Rowan Aldridge, LCSW" */
+/**
+ * Tidies a scraped phone number into one house format: `(555) 010-2288`.
+ *
+ * What arrives is rarely clean. A `tel:` href gives bare digits
+ * (`tel:+15550102288`); page text gives whatever the site's designer typed —
+ * `555.010.2288`, `(555)010-2288`, non-breaking spaces, an en dash, a
+ * "Call:" prefix, or two numbers run together when a footer lists office and
+ * mobile side by side.
+ *
+ * NEVER INVENTS ONE. A phone number in a referral directory gets dialled, so
+ * anything this can't confidently read as a 10-digit North American number is
+ * returned with its whitespace collapsed and nothing else touched — visibly
+ * odd, which is the right outcome, rather than confidently wrong. That means
+ * international numbers pass through as written instead of being mangled into
+ * a shape they don't have.
+ *
+ * An extension is kept and normalised to `ext.`, since losing one silently
+ * means calling a main line that doesn't reach the person.
+ */
+export function normalizePhone(raw) {
+  const text = String(raw ?? "").replace(/[\u00a0\u2007\u202f]/g, " ").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+
+  const ext = text.match(/(?:\b(?:ext|ext\.|x|extension)\s*)(\d{1,6})\s*$/i);
+  const body = ext ? text.slice(0, ext.index) : text;
+  const suffix = ext ? ` ext. ${ext[1]}` : "";
+
+  // A country code that isn't North America's, said explicitly. Cheaper to
+  // read than to infer from the digit count, and it catches the short ones.
+  if (/^\+(?!1\b)/.test(body.trim()) && !/^\+1[\s.\-(]/.test(body.trim()) && !/^\+1\d{10}$/.test(body.replace(/[^\d+]/g, ""))) {
+    return text;
+  }
+
+  let digits = (body.match(/\d/g) || []).join("");
+  // A leading country code for North America, however it was written.
+  if (digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
+
+  // Two numbers jammed together — an office and a mobile with nothing between
+  // them in a footer. The first is the one the page led with, and it is the
+  // only one this field can hold.
+  //
+  // Both halves have to look like real numbers before this splits anything.
+  // Taking the first ten digits of any long run is how "+44 20 7946 0018"
+  // becomes "(442) 079-4600" — a number that dials someone, invented out of a
+  // number that didn't. My own test caught that; the check below is what
+  // stops it, because an international number leaves a remainder that is not
+  // itself a plausible North American number.
+  if (digits.length > 11) {
+    const lead = digits.startsWith("1") ? digits.slice(1, 11) : digits.slice(0, 10);
+    let rest = digits.slice(digits.startsWith("1") ? 11 : 10);
+    if (rest.length === 11 && rest.startsWith("1")) rest = rest.slice(1);
+    const bothPlausible = /^[2-9]\d{9}$/.test(lead) && /^[2-9]\d{9}$/.test(rest);
+    return bothPlausible ? format(lead) + suffix : text;
+  }
+
+  if (digits.length !== 10) return text;
+  // A North American area code never starts with 0 or 1. A 10-digit run that
+  // does is something else — a date, an id — and not ours to reformat.
+  if (!/^[2-9]/.test(digits)) return text;
+  return format(digits) + suffix;
+}
+
+function format(d) {
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+}
+
 export function displayName(fields) {
   const name = (fields.fullName || "").trim();
   const credentials = (fields.credentials || "").trim();

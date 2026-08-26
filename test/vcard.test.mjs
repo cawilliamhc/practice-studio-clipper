@@ -5,6 +5,7 @@ import {
   displayName,
   escapeText,
   foldLine,
+  normalizePhone,
   photoExtension,
   photoFileName,
   slugify,
@@ -187,5 +188,62 @@ describe("helpers", () => {
 
   test("displayName tolerates missing credentials", () => {
     assert.equal(displayName({ fullName: "Mira Okonjo" }), "Mira Okonjo");
+  });
+});
+
+// A phone number in a referral directory gets dialled, so the rule that
+// matters most here is what this REFUSES to reformat.
+describe("normalizePhone", () => {
+  test("formats a bare tel: href", () => {
+    assert.equal(normalizePhone("+15550102288"), "(555) 010-2288");
+    assert.equal(normalizePhone("5550102288"), "(555) 010-2288");
+  });
+
+  test("normalises whatever punctuation the site used", () => {
+    for (const written of [
+      "555.010.2288",
+      "(555)010-2288",
+      "555 010 2288",
+      "+1 (555) 010-2288",
+      "1-555-010-2288",
+      "555–010–2288",
+    ]) {
+      assert.equal(normalizePhone(written), "(555) 010-2288", written);
+    }
+  });
+
+  test("collapses non-breaking spaces and stray prose spacing", () => {
+    assert.equal(normalizePhone("  (555) 010‑2288  "), "(555) 010-2288");
+  });
+
+  test("keeps an extension rather than losing it silently", () => {
+    assert.equal(normalizePhone("555-010-2288 ext 4"), "(555) 010-2288 ext. 4");
+    assert.equal(normalizePhone("555-010-2288 x212"), "(555) 010-2288 ext. 212");
+    assert.equal(normalizePhone("(555) 010-2288 extension 9"), "(555) 010-2288 ext. 9");
+  });
+
+  test("takes the first of two numbers run together", () => {
+    assert.equal(normalizePhone("55501022885550103399"), "(555) 010-2288");
+    assert.equal(normalizePhone("(555) 010-2288(555) 010-3399"), "(555) 010-2288");
+  });
+
+  // Everything below is a number this must NOT rewrite.
+  test("leaves an international number as written", () => {
+    assert.equal(normalizePhone("+44 20 7946 0018"), "+44 20 7946 0018");
+  });
+
+  test("leaves a run of digits that isn't a phone number", () => {
+    assert.equal(normalizePhone("1234567890"), "1234567890");
+    assert.equal(normalizePhone("0123456789"), "0123456789");
+  });
+
+  test("leaves something too short to be one", () => {
+    assert.equal(normalizePhone("555-2288"), "555-2288");
+  });
+
+  test("handles nothing at all", () => {
+    assert.equal(normalizePhone(""), "");
+    assert.equal(normalizePhone(undefined), "");
+    assert.equal(normalizePhone(null), "");
   });
 });

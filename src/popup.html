@@ -33,6 +33,13 @@
         }
       }
       * { box-sizing: border-box; }
+      /* `hidden` has to outrank the layout rules below it. `.photo` and
+         `.shots` set `display: flex`, and an AUTHOR rule beats the user
+         agent's `[hidden] { display: none }` whatever the specificity — so
+         the headshot block was never actually hidden by its own attribute.
+         Invisible while every clip succeeded; the moment one failed, a
+         broken-image placeholder appeared with nothing behind it. */
+      [hidden] { display: none !important; }
       body {
         /* Was a fixed 360px, which is what a popup gets. A side panel is
            resizable by the user, so this follows the panel instead — with a
@@ -166,6 +173,8 @@
       #status.ok { color: var(--ok); }
       #status.err { color: var(--err); }
       .link-button {
+        display: block;
+        text-align: left;
         margin: 0 0 8px;
         padding: 0;
         border: 0;

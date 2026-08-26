@@ -6,7 +6,7 @@
 // document context, which a MV3 service worker doesn't have.
 import { buildVCard, displayName, normalizePhone, photoFileName, vcardFileName } from "./vcard.js";
 import { normalizeWithLocalModel } from "./llm.js";
-import { runInActiveTab } from "./active-tab.js";
+import { runInActiveTab, readableScrapeError } from "./active-tab.js";
 import {
   describePriorClip,
   findPriorClip,
@@ -361,9 +361,19 @@ async function readPage() {
     if (useModel.checked) await runLocalModel();
   } catch (err) {
     pageUrl.textContent = "";
-    setStatus(err?.message || "Something went wrong.", "err");
+    // The form still gets built, empty. A popup died with the page that
+    // failed, so having nothing to show was the same as being closed; the
+    // panel stays open, and a panel with no fields in it looks broken and
+    // leaves nowhere to type a contact in by hand.
+    render({}, {});
+    showPhoto(null);
+    shotCandidates = { likely: [], rest: [] };
+    renderShots();
+    refreshSaveState();
+    setStatus(readableScrapeError(err), "err");
   }
 }
+
 
 reread.addEventListener("click", async () => {
   reread.disabled = true;

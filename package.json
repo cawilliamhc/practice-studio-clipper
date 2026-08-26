@@ -1,6 +1,6 @@
 {
   "name": "practice-studio-clipper",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "Chrome/Vivaldi extension that clips a therapist's website into a vCard, or a book page into a library record, for Practice Studio.",

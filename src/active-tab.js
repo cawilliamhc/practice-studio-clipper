@@ -14,23 +14,37 @@ export async function runInActiveTab(file) {
 }
 
 /**
- * Turns a failed page read into something worth reading.
+ * Turns a failed page read into something worth acting on.
  *
- * The guard in active-tab.js checks `tab.url`, and on a restricted page there
- * is no `tab.url` to check — activeTab is never granted for one, so the guard
- * waves it through and Chrome raises "Cannot access a chrome:// URL" from
- * inside executeScript instead. Accurate, and it reads like a crash rather
- * than like the ordinary "you are on the wrong tab" that it is.
+ * Two failures look alike from here and need opposite advice, and an earlier
+ * version of this collapsed them into one — which sent me to "open the
+ * therapist's site" while I was already standing on it:
+ *
+ *   RESTRICTED PAGE — chrome://, the web store, another extension. Nothing
+ *   can ever read these. Go somewhere else.
+ *
+ *   NOT INVOKED ON THIS TAB — an ordinary site the extension simply has no
+ *   permission for, because `activeTab` is granted per tab by clicking the
+ *   toolbar button, and this tab never got that click. Common now the panel
+ *   outlives the tab it was opened on: browsing to a second therapist and
+ *   pressing "Read this page" lands here every time.
+ *
+ * The guard above catches neither, and can't: it tests `tab.url`, which is
+ * itself only readable with permission, so on both of these it sees undefined
+ * and waves the tab through to executeScript.
  */
 export function readableScrapeError(err) {
   const raw = err?.message || "";
-  // Chrome's exact wordings, which are worth pinning rather than paraphrasing:
-  // "Cannot access a chrome:// URL", "Cannot access contents of the page.",
-  // "The extensions gallery cannot be scripted." (note the plural, which an
-  // earlier version of this pattern got wrong and a test caught), and
-  // "Cannot access a chrome-extension:// URL of different extension".
-  if (/cannot access|chrome:\/\/|extensions? gallery|chrome-extension:|cannot be scripted/i.test(raw)) {
-    return "This page can't be clipped — open the therapist's site, then Read this page.";
+
+  // Chrome's exact wordings, pinned rather than paraphrased. "extensions
+  // gallery" is plural — an earlier pattern got that wrong and a test caught it.
+  if (/chrome:\/\/|chrome-extension:|extensions? gallery|cannot be scripted/i.test(raw)) {
+    return "This page can't be clipped — browsers keep extensions out of their own pages. Open the therapist's site instead.";
+  }
+  // "Cannot access contents of the page. Extension manifest must request
+  // permission to access the respective host."
+  if (/cannot access contents|must request permission|cannot access/i.test(raw)) {
+    return "Click the Practice Studio button in the toolbar on this tab, then try again — the extension only gets to read a page you've opened it on.";
   }
   return raw || "Something went wrong.";
 }

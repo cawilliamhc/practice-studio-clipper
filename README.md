@@ -112,9 +112,20 @@ and the form are usable at the same time.
 Two consequences worth knowing:
 
 - **`default_popup` is gone from the manifest.** With it set, the toolbar click
-  opens a popup and the panel never gets a look in. `background.js` sets
-  `openPanelOnActionClick` instead, with an `action.onClicked` fallback for a
-  build that has the API but ignores that flag.
+  opens a popup and the panel never gets a look in. `background.js` handles
+  `action.onClicked` and opens the panel itself.
+- **It deliberately does NOT use `setPanelBehavior({ openPanelOnActionClick })`**,
+  which is the obvious way to do this and was the first thing tried. That makes
+  the *browser* handle the click, so no event reaches the extension and
+  `activeTab` is never granted — the panel opened perfectly and every scrape
+  failed with "Cannot access contents of the page" on ordinary therapist sites.
+  Handling the click ourselves makes it an extension invocation, which is what
+  grants the permission to read that tab.
+- **The grant is per tab**, and that is the tradeoff for keeping `activeTab`
+  instead of asking for `<all_urls>`. The extension can read a page only on a
+  tab where you clicked the button — never any tab at any time. So browsing to
+  a second therapist and pressing "Read this page" reads nothing: click the
+  toolbar button on that tab instead. The status line says so.
 - **"Read this page"** sits under the page URL. The panel outlives the page it
   was opened on, so it needs a way to be pointed at whatever tab you are on
   now. It is a button and not automatic on tab change on purpose: a re-read

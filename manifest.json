@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Practice Studio Clipper",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Clips a therapist's website into a vCard, or a book page into a library record, for Practice Studio.",
   "permissions": [
     "activeTab",

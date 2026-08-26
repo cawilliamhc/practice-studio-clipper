@@ -252,3 +252,23 @@ describe("thinking models", () => {
     assert.equal(emptyReplyMessage(undefined), "The model returned an empty reply.");
   });
 });
+
+// A model that copies a keyword-stuffed page and then generalises forever
+// was the second failure, after thinking was fixed: 559 tokens of runaway
+// list, ~37s, which surfaced only as "Local model timed out".
+describe("runaway replies", () => {
+  test("the token budget is small enough to bound a repetition loop", () => {
+    const req = buildRequest(PAGE, FILLABLE_FIELDS, "m");
+    // A clean reply measures 25-90 tokens; this leaves room without leaving runway.
+    assert.ok(req.max_tokens <= 300, `max_tokens was ${req.max_tokens}`);
+  });
+
+  // Deliberately compatible with the temperature-0 pin above: a presence
+  // penalty applies to the logits before selection, so it breaks a loop
+  // without giving up the "same page, same answer" property.
+  test("a presence penalty is sent, since greedy decoding is what loops", () => {
+    const req = buildRequest(PAGE, FILLABLE_FIELDS, "m");
+    assert.ok(req.presence_penalty > 0);
+    assert.equal(req.temperature, 0);
+  });
+});

@@ -315,6 +315,15 @@ drops — vLLM and SGLang do honour it).
 nothing usable comes back at all the status line now names the setting: **Inference →
 Reasoning → Enable Thinking**, which is a per-model toggle in LM Studio and defaults to on.
 
+**Gemma 4 and "LM Studio returned 400".** Gemma rejects the constrained request outright:
+LM Studio seeds the JSON-schema grammar sampler with the assistant prefill, `<think>` isn't
+JSON, and the engine fails with "Failed to initialize samplers". Dropping the prefill
+instead would be worse — Gemma thinks by default too (14s and 353 reasoning tokens on a
+one-line page, against 2.6s and none with the prefill). So on a 400 the request is retried
+once without `response_format`, with the keys named in the prompt instead. Gemma answers
+with a fenced object, which `extractJsonObject` already unwraps, and the reply goes through
+the same verification as a constrained one.
+
 Requirements: LM Studio running with a chat model loaded. The model is auto-selected from
 `/v1/models` (embedding models skipped), so there's no id to keep in sync. If the server
 isn't running, the clip still works — the status line says so and the deterministic fields

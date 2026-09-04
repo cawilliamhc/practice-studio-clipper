@@ -11,6 +11,7 @@ import {
   extractJsonObject,
   FILLABLE_FIELDS,
   missingFields,
+  normalizeWithLocalModel,
   pickModel,
   verifyCandidate,
 } from "../src/llm.js";
@@ -270,5 +271,65 @@ describe("runaway replies", () => {
     const req = buildRequest(PAGE, FILLABLE_FIELDS, "m");
     assert.ok(req.presence_penalty > 0);
     assert.equal(req.temperature, 0);
+  });
+});
+
+// Gemma 4 under LM Studio answers the constrained request with HTTP 400,
+// "Failed to initialize samplers": the grammar sampler is seeded with the
+// thinking prefill, and "<think>" is not JSON. The prefill has to stay (Gemma
+// thinks by default too), so the schema is what gives way.
+describe("schema fallback", () => {
+  test("the unconstrained request drops the schema and asks for the keys in the prompt", () => {
+    const req = buildRequest(PAGE, ["organization", "specialization"], "gemma", { schema: false });
+    assert.equal(req.response_format, undefined);
+    assert.match(req.messages[0].content, /organization, specialization/);
+    assert.equal(req.messages.at(-1).role, "assistant", "the prefill survives the fallback");
+  });
+
+  test("the constrained request is untouched by the option's default", () => {
+    assert.deepEqual(buildRequest(PAGE, ["organization"], "m"), buildRequest(PAGE, ["organization"], "m", { schema: true }));
+  });
+
+  async function withFetch(handler, run) {
+    const original = globalThis.fetch;
+    globalThis.fetch = handler;
+    try {
+      return await run();
+    } finally {
+      globalThis.fetch = original;
+    }
+  }
+
+  const json = (body, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+  test("a 400 on the constrained request is retried without the schema", async () => {
+    const bodies = [];
+    const result = await withFetch(async (url, options) => {
+      if (String(url).endsWith("/models")) return json({ data: [{ id: "gemma" }] });
+      const body = JSON.parse(options.body);
+      bodies.push(body);
+      if (body.response_format) return json({ error: "Failed to initialize samplers" }, 400);
+      return json({
+        choices: [{ message: { content: '```json\n{"organization": "Northgate Family Therapy", "specialization": "EMDR"}\n```' }, finish_reason: "stop" }],
+      });
+    }, () => normalizeWithLocalModel(SCRAPED, PAGE, { endpoint: "http://stub/v1" }));
+
+    assert.equal(bodies.length, 2);
+    assert.ok(bodies[0].response_format);
+    assert.equal(bodies[1].response_format, undefined);
+    assert.equal(result.error, null);
+    assert.equal(result.filled.organization, "Northgate Family Therapy");
+  });
+
+  test("any other failure is reported, not retried", async () => {
+    let calls = 0;
+    const result = await withFetch(async (url) => {
+      if (String(url).endsWith("/models")) return json({ data: [{ id: "m" }] });
+      calls += 1;
+      return json({ error: "loading" }, 503);
+    }, () => normalizeWithLocalModel(SCRAPED, PAGE, { endpoint: "http://stub/v1" }));
+    assert.equal(calls, 1);
+    assert.equal(result.error, "LM Studio returned 503");
   });
 });
